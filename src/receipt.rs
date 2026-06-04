@@ -1,6 +1,10 @@
 use crate::policy::{BackendKind, PolicyAction};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::fs::{self, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -49,6 +53,13 @@ pub struct RollbackReceipt {
     pub status: ReceiptStatus,
     pub created_unix: u64,
     pub details: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "record")]
+pub enum ReceiptRecord {
+    Apply { receipt: Receipt },
+    Rollback { receipt: RollbackReceipt },
 }
 
 impl Rollback {
@@ -107,12 +118,84 @@ impl RollbackReceipt {
     }
 }
 
+pub fn append_receipt(path: &Path, receipt: &Receipt) -> Result<()> {
+    append_record(
+        path,
+        &ReceiptRecord::Apply {
+            receipt: receipt.clone(),
+        },
+    )
+}
+
+pub fn append_rollback_receipt(path: &Path, receipt: &RollbackReceipt) -> Result<()> {
+    append_record(
+        path,
+        &ReceiptRecord::Rollback {
+            receipt: receipt.clone(),
+        },
+    )
+}
+
+pub fn load_receipt_records(path: &Path) -> Result<Vec<ReceiptRecord>> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let file = fs::File::open(path)
+        .with_context(|| format!("failed to open receipt log {}", path.display()))?;
+    let reader = BufReader::new(file);
+    let mut records = Vec::new();
+    for line in reader.lines() {
+        let line = line.with_context(|| format!("failed to read {}", path.display()))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        records.push(
+            serde_json::from_str(&line)
+                .with_context(|| format!("failed to parse receipt in {}", path.display()))?,
+        );
+    }
+    Ok(records)
+}
+
+pub fn last_apply_receipt(path: &Path) -> Result<Option<Receipt>> {
+    Ok(load_receipt_records(path)?
+        .into_iter()
+        .rev()
+        .find_map(|record| match record {
+            ReceiptRecord::Apply { receipt } => Some(receipt),
+            ReceiptRecord::Rollback { .. } => None,
+        }))
+}
+
+fn append_record(path: &Path, record: &ReceiptRecord) -> Result<()> {
+    ensure_parent_dir(path)?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .with_context(|| format!("failed to open receipt log {}", path.display()))?;
+    writeln!(file, "{}", serde_json::to_string(record)?)
+        .with_context(|| format!("failed to append receipt log {}", path.display()))?;
+    Ok(())
+}
+
+fn ensure_parent_dir(path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::TrafficClass;
     use crate::policy::{ActionSelector, PolicyAction};
     use crate::profile::ProfileId;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn dry_run_receipt_carries_rollback_plan() {
@@ -132,5 +215,35 @@ mod tests {
         assert!(receipt.dry_run);
         assert!(receipt.rollback.ready);
         assert_eq!(receipt.rollback.method, RollbackMethod::RemoveAction);
+    }
+
+    #[test]
+    fn receipt_log_round_trips_apply_and_rollback_records() {
+        let action = PolicyAction::dscp_mark(
+            "game-dscp",
+            ProfileId::GameBoost,
+            ActionSelector::TrafficClass {
+                class: TrafficClass::Interactive,
+            },
+            46,
+            "protect game flow",
+        );
+        let receipt = Receipt::dry_run("receipt-1", action, 123);
+        let rollback =
+            RollbackReceipt::removed("rollback-1", "game-dscp", BackendKind::LocalDscp, 124);
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("winqos-receipts-{unique}.jsonl"));
+
+        append_receipt(&path, &receipt).unwrap();
+        append_rollback_receipt(&path, &rollback).unwrap();
+        let records = load_receipt_records(&path).unwrap();
+        let last = last_apply_receipt(&path).unwrap().unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(records.len(), 2);
+        assert_eq!(last.id, "receipt-1");
     }
 }

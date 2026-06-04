@@ -1,11 +1,15 @@
 use crate::backend::{Backend, LocalDscpBackend, RouterQosdBackend, WinDivertLabBackend};
 use crate::collector::collect_windows_tcp_connections;
 use crate::config::{Config, DEFAULT_CONFIG};
-use crate::feedback::{FeedbackEvent, load_feedback_state, record_feedback_event};
+use crate::daemon::{DaemonOptions, install_plan as build_install_plan, run_daemon};
+use crate::feedback::{
+    FeedbackEvent, load_feedback_state, record_feedback_event, save_feedback_state,
+};
 use crate::learning::{load_state, now_unix};
 use crate::petscii::{render_explain, render_status};
-use crate::policy::{ActionSelector, PolicyAction};
+use crate::policy::{ActionSelector, BackendKind, PolicyAction};
 use crate::profile::ProfileId;
+use crate::receipt::{append_rollback_receipt, last_apply_receipt};
 use crate::runner::{init_config, print_sample_table, run_cycle};
 use anyhow::{Result, anyhow, bail};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -50,6 +54,22 @@ enum Commands {
     Feedback {
         #[command(subcommand)]
         command: FeedbackCommands,
+    },
+    Pause {
+        #[arg(long, default_value = "manual")]
+        reason: String,
+    },
+    Resume,
+    Rollback {
+        #[arg(long)]
+        last: bool,
+        #[arg(long)]
+        live: bool,
+    },
+    InstallPlan,
+    Daemon {
+        #[command(subcommand)]
+        command: DaemonCommands,
     },
     Backend {
         target: BackendTarget,
@@ -120,6 +140,17 @@ enum BackendCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum DaemonCommands {
+    Run {
+        #[arg(long)]
+        once: bool,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    InstallPlan,
+}
+
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -188,6 +219,54 @@ pub fn run() -> Result<()> {
             let report = record_feedback_event(&config, event)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
             Ok(())
+        }
+        Commands::Pause { reason } => {
+            let config = Config::load_or_default(&cli.config)?;
+            let mut policy = load_feedback_state(&config.policy_state_path)?;
+            policy.pause(reason, now_unix());
+            save_feedback_state(&config.policy_state_path, &policy)?;
+            println!("{}", render_status(&policy));
+            Ok(())
+        }
+        Commands::Resume => {
+            let config = Config::load_or_default(&cli.config)?;
+            let mut policy = load_feedback_state(&config.policy_state_path)?;
+            policy.resume(now_unix());
+            save_feedback_state(&config.policy_state_path, &policy)?;
+            println!("{}", render_status(&policy));
+            Ok(())
+        }
+        Commands::Rollback { last: _, live } => {
+            let config = Config::load_or_default(&cli.config)?;
+            rollback_last(&config, live)
+        }
+        Commands::InstallPlan => {
+            let config = Config::load_or_default(&cli.config)?;
+            let plan = build_install_plan(&cli.config, &config);
+            println!("{}", serde_json::to_string_pretty(&plan)?);
+            Ok(())
+        }
+        Commands::Daemon { command } => {
+            let config = Config::load_or_default(&cli.config)?;
+            match command {
+                DaemonCommands::Run { once, dry_run } => {
+                    let report = run_daemon(
+                        &config,
+                        &DaemonOptions {
+                            once,
+                            dry_run,
+                            cycles: None,
+                        },
+                    )?;
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                    Ok(())
+                }
+                DaemonCommands::InstallPlan => {
+                    let plan = build_install_plan(&cli.config, &config);
+                    println!("{}", serde_json::to_string_pretty(&plan)?);
+                    Ok(())
+                }
+            }
         }
         Commands::Backend { target, command } => {
             let config = Config::load_or_default(&cli.config)?;
@@ -272,6 +351,29 @@ fn backend_for(config: &Config, target: BackendTarget, dry_run: bool) -> Box<dyn
         BackendTarget::WindivertLab => Box::new(WinDivertLabBackend),
     }
 }
+
+fn backend_for_kind(config: &Config, kind: BackendKind, dry_run: bool) -> Box<dyn Backend> {
+    match kind {
+        BackendKind::LocalDscp => Box::new(if dry_run {
+            LocalDscpBackend::dry_run()
+        } else {
+            LocalDscpBackend::live()
+        }),
+        BackendKind::RouterQosd => Box::new(RouterQosdBackend::new(config.clone(), dry_run)),
+        BackendKind::WinDivertLab => Box::new(WinDivertLabBackend),
+    }
+}
+
+fn rollback_last(config: &Config, live: bool) -> Result<()> {
+    let receipt = last_apply_receipt(&config.receipts_path)?
+        .ok_or_else(|| anyhow!("no apply receipt found to roll back"))?;
+    let backend = backend_for_kind(config, receipt.action.backend, !live);
+    let rollback = backend.remove(&receipt.action.id)?;
+    append_rollback_receipt(&config.receipts_path, &rollback)?;
+    println!("{}", serde_json::to_string_pretty(&rollback)?);
+    Ok(())
+}
+
 
 fn dscp_selector(
     process_path: Option<String>,

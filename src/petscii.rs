@@ -38,6 +38,7 @@ pub fn render_decision(decision: &AutopilotDecision) -> String {
 
 pub fn render_status(state: &FeedbackState) -> String {
     let profile = state.last_profile.unwrap_or(ProfileId::Normal);
+    let status = if state.paused { "PAUSED" } else { "READY" };
     let mut lines = vec![
         "+-------------------------- WQ OVERDRIVE --------------------------+".into(),
         format!(
@@ -47,15 +48,22 @@ pub fn render_status(state: &FeedbackState) -> String {
             state.profile_bias(profile)
         ),
         format!(
-            "| ACTIONS {:<16} IGNORED {:<7}       STATUS READY  |",
+            "| ACTIONS {:<16} IGNORED {:<7}       STATUS {:<6} |",
             state.last_action_ids.len(),
-            state.ignored_processes.len()
+            state.ignored_processes.len(),
+            status
         ),
         "+------------------------------------------------------------------+".into(),
         String::new(),
         "INFORMATION".into(),
     ];
 
+    if let Some(reason) = &state.pause_reason {
+        lines.push(format!("paused: {reason}"));
+    }
+    if let Some(error) = &state.last_error {
+        lines.push(format!("last_error: {error}"));
+    }
     if state.last_explanation.is_empty() {
         lines.push("no autopilot decision recorded yet".into());
     } else {
@@ -149,5 +157,16 @@ mod tests {
 
         assert!(rendered.contains("PACKET MAP"));
         assert!(rendered.contains("STEAM SINK"));
+    }
+
+    #[test]
+    fn status_renders_paused_state() {
+        let mut state = FeedbackState::default();
+        state.pause("manual", 1);
+
+        let rendered = render_status(&state);
+
+        assert!(rendered.contains("STATUS PAUSED"));
+        assert!(rendered.contains("paused: manual"));
     }
 }

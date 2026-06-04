@@ -9,12 +9,25 @@ use std::path::Path;
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FeedbackState {
+    #[serde(default)]
     pub updated_unix: u64,
+    #[serde(default)]
+    pub paused: bool,
+    #[serde(default)]
+    pub pause_reason: Option<String>,
+    #[serde(default)]
+    pub last_error: Option<String>,
+    #[serde(default)]
     pub profile_bias: BTreeMap<String, i32>,
+    #[serde(default)]
     pub ignored_processes: BTreeMap<String, String>,
+    #[serde(default)]
     pub last_profile: Option<ProfileId>,
+    #[serde(default)]
     pub last_confidence: f32,
+    #[serde(default)]
     pub last_action_ids: Vec<String>,
+    #[serde(default)]
     pub last_explanation: Vec<String>,
 }
 
@@ -67,6 +80,26 @@ impl FeedbackState {
         self.last_confidence = confidence;
         self.last_action_ids = action_ids;
         self.last_explanation = explanation;
+    }
+
+    pub fn pause(&mut self, reason: impl Into<String>, updated_unix: u64) {
+        self.updated_unix = updated_unix;
+        self.paused = true;
+        self.pause_reason = Some(reason.into());
+    }
+
+    pub fn resume(&mut self, updated_unix: u64) {
+        self.updated_unix = updated_unix;
+        self.paused = false;
+        self.pause_reason = None;
+        self.last_error = None;
+    }
+
+    pub fn fail_closed(&mut self, error: impl Into<String>, updated_unix: u64) {
+        self.updated_unix = updated_unix;
+        self.paused = true;
+        self.pause_reason = Some("fail_closed".into());
+        self.last_error = Some(error.into());
     }
 }
 
@@ -267,5 +300,23 @@ mod tests {
         );
 
         assert!(state.is_process_ignored("steam.EXE"));
+    }
+
+    #[test]
+    fn pause_resume_and_fail_closed_update_state() {
+        let mut state = FeedbackState::default();
+
+        state.pause("manual", 1);
+        assert!(state.paused);
+        assert_eq!(state.pause_reason.as_deref(), Some("manual"));
+
+        state.fail_closed("backend failed", 2);
+        assert!(state.paused);
+        assert_eq!(state.last_error.as_deref(), Some("backend failed"));
+
+        state.resume(3);
+        assert!(!state.paused);
+        assert!(state.pause_reason.is_none());
+        assert!(state.last_error.is_none());
     }
 }

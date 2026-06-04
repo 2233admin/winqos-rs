@@ -1,11 +1,15 @@
 use crate::autopilot::decide_autopilot;
-use crate::backend::{dedupe_candidates, push_routerqosd};
+use crate::backend::{
+    Backend, LocalDscpBackend, RouterQosdBackend, WinDivertLabBackend, dedupe_candidates,
+};
 use crate::classifier::Classifier;
 use crate::collector::collect_windows_tcp_connections;
 use crate::config::Config;
 use crate::feedback::{load_feedback_state, save_feedback_state};
 use crate::learning::{load_state, now_unix, save_state, update_learning};
 use crate::model::{BackendReport, ClassifiedConnection, ConnectionSample, RunReport};
+use crate::policy::{BackendKind, PolicyAction, PolicyActionKind};
+use crate::receipt::{Receipt, append_receipt};
 use anyhow::{Context, Result, anyhow};
 use std::collections::BTreeMap;
 use std::fs;
@@ -64,6 +68,17 @@ pub fn run_cycle_with_samples(
     save_state(&config.state_path, &state)?;
     let mut feedback = load_feedback_state(&config.policy_state_path)?;
     let autopilot = decide_autopilot(&classified, &feedback, dry_run);
+    let mut receipts = Vec::new();
+    if !feedback.paused {
+        match apply_policy_actions(config, &autopilot.actions, dry_run) {
+            Ok(mut applied) => receipts.append(&mut applied),
+            Err(error) => {
+                feedback.fail_closed(error.to_string(), now_unix());
+                save_feedback_state(&config.policy_state_path, &feedback)?;
+                return Err(error);
+            }
+        }
+    }
     feedback.set_last_decision(
         autopilot.profile,
         autopilot.confidence,
@@ -83,7 +98,18 @@ pub fn run_cycle_with_samples(
             .filter_map(|item| item.router_candidate.clone()),
     );
     let backend = if config.backends.routerqosd.enabled {
-        push_routerqosd(config, &candidates, dry_run)?
+        match apply_router_candidates(config, &candidates, dry_run) {
+            Ok((report, mut router_receipts)) => {
+                receipts.append(&mut router_receipts);
+                report
+            }
+            Err(error) => {
+                let mut feedback = load_feedback_state(&config.policy_state_path)?;
+                feedback.fail_closed(error.to_string(), now_unix());
+                save_feedback_state(&config.policy_state_path, &feedback)?;
+                return Err(error);
+            }
+        }
     } else {
         BackendReport {
             name: "routerqosd".into(),
@@ -99,6 +125,7 @@ pub fn run_cycle_with_samples(
         sample_count: samples.len(),
         class_counts: class_counts(&classified),
         autopilot,
+        receipts,
         candidate_count: candidates.len(),
         candidates,
         backend,
@@ -113,6 +140,76 @@ pub fn class_counts(items: &[ClassifiedConnection]) -> BTreeMap<String, usize> {
             .or_default() += 1;
     }
     counts
+}
+
+fn apply_policy_actions(
+    config: &Config,
+    actions: &[PolicyAction],
+    dry_run: bool,
+) -> Result<Vec<Receipt>> {
+    let mut receipts = Vec::new();
+    for action in actions {
+        if action.kind == PolicyActionKind::ObserveOnly {
+            continue;
+        }
+        let receipt = backend_for_action(config, action.backend, dry_run).apply(action)?;
+        append_receipt(&config.receipts_path, &receipt)?;
+        receipts.push(receipt);
+    }
+    Ok(receipts)
+}
+
+fn apply_router_candidates(
+    config: &Config,
+    candidates: &[crate::model::RouterCandidate],
+    dry_run: bool,
+) -> Result<(BackendReport, Vec<Receipt>)> {
+    let mut receipts = Vec::new();
+    let backend = RouterQosdBackend::new(config.clone(), dry_run);
+    for candidate in candidates {
+        let action = PolicyAction::router_ipset(
+            format!(
+                "routerqosd.{}.{}",
+                candidate.set_name,
+                sanitize_action_id(&candidate.member)
+            ),
+            crate::profile::ProfileId::SteamSink,
+            candidate.set_name.clone(),
+            candidate.member.clone(),
+            candidate.reason.clone(),
+        );
+        let receipt = backend.apply(&action)?;
+        append_receipt(&config.receipts_path, &receipt)?;
+        receipts.push(receipt);
+    }
+    Ok((
+        BackendReport {
+            name: "routerqosd".into(),
+            dry_run,
+            executed: receipts.iter().any(|receipt| !receipt.dry_run),
+            ok: receipts
+                .iter()
+                .all(|receipt| receipt.status != crate::receipt::ReceiptStatus::Failed),
+            stdout: format!("receipts={}", receipts.len()),
+            stderr: String::new(),
+        },
+        receipts,
+    ))
+}
+
+fn backend_for_action(config: &Config, kind: BackendKind, dry_run: bool) -> Box<dyn Backend + '_> {
+    match kind {
+        BackendKind::LocalDscp => Box::new(LocalDscpBackend::new(dry_run)),
+        BackendKind::RouterQosd => Box::new(RouterQosdBackend::new(config.clone(), dry_run)),
+        BackendKind::WinDivertLab => Box::new(WinDivertLabBackend),
+    }
+}
+
+fn sanitize_action_id(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect()
 }
 
 #[cfg(test)]
@@ -176,6 +273,11 @@ mod tests {
         assert_eq!(
             report.autopilot.profile,
             crate::profile::ProfileId::SteamSink
+        );
+        assert_eq!(report.receipts.len(), 1);
+        assert_eq!(
+            report.receipts[0].status,
+            crate::receipt::ReceiptStatus::DryRun
         );
         assert_eq!(report.candidate_count, 1);
         assert_eq!(report.class_counts.get("bulk"), Some(&1));

@@ -52,7 +52,14 @@ pub fn decide_with_pack(
     dry_run: bool,
     observed_unix: u64,
 ) -> AutopilotDecision {
-    let signals = signals_from_classified(classified, feedback, observed_unix);
+    let mut signals = signals_from_classified(classified, feedback, observed_unix);
+    if feedback.paused {
+        signals.push(
+            Signal::new(SignalKind::PauseFlag, "policy_state", observed_unix)
+                .with_confidence(1.0)
+                .with_weight(1.0),
+        );
+    }
     let scores: Vec<_> = pack
         .profiles
         .iter()
@@ -385,5 +392,29 @@ mod tests {
             signals_from_classified(&[classified("steam", TrafficClass::Bulk)], &feedback, 1);
 
         assert!(signals.is_empty());
+    }
+
+    #[test]
+    fn paused_state_selects_paused_profile() {
+        let feedback = FeedbackState {
+            paused: true,
+            ..FeedbackState::default()
+        };
+
+        let decision = decide_with_pack(
+            &[classified("steam", TrafficClass::Bulk)],
+            &feedback,
+            &builtin_profile_pack(),
+            true,
+            1,
+        );
+
+        assert_eq!(decision.profile, ProfileId::Paused);
+        assert!(
+            decision
+                .signals
+                .iter()
+                .any(|signal| signal.kind == SignalKind::PauseFlag)
+        );
     }
 }
