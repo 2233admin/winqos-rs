@@ -5,6 +5,7 @@ use crate::daemon::{DaemonOptions, install_plan as build_install_plan, run_daemo
 use crate::feedback::{
     FeedbackEvent, load_feedback_state, record_feedback_event, save_feedback_state,
 };
+use crate::lab::{LabScenario, optimize_latest, run_lab, summarize_lab};
 use crate::learning::{load_state, now_unix};
 use crate::petscii::{render_explain, render_status};
 use crate::policy::{ActionSelector, BackendKind, PolicyAction};
@@ -67,6 +68,10 @@ enum Commands {
         live: bool,
     },
     InstallPlan,
+    Lab {
+        #[command(subcommand)]
+        command: LabCommands,
+    },
     Daemon {
         #[command(subcommand)]
         command: DaemonCommands,
@@ -149,6 +154,26 @@ enum DaemonCommands {
         dry_run: bool,
     },
     InstallPlan,
+}
+
+#[derive(Subcommand, Debug)]
+enum LabCommands {
+    Baseline,
+    Run {
+        scenario: LabTarget,
+    },
+    Report,
+    Optimize {
+        profile: ProfileId,
+        #[arg(long)]
+        live: bool,
+    },
+}
+
+#[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
+enum LabTarget {
+    Game,
+    Stream,
 }
 
 pub fn run() -> Result<()> {
@@ -246,6 +271,28 @@ pub fn run() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&plan)?);
             Ok(())
         }
+        Commands::Lab { command } => {
+            let config = Config::load_or_default(&cli.config)?;
+            match command {
+                LabCommands::Baseline => println!(
+                    "{}",
+                    serde_json::to_string_pretty(&run_lab(&config, LabScenario::Baseline)?)?
+                ),
+                LabCommands::Run { scenario } => println!(
+                    "{}",
+                    serde_json::to_string_pretty(&run_lab(&config, scenario.into())?)?
+                ),
+                LabCommands::Report => println!(
+                    "{}",
+                    serde_json::to_string_pretty(&summarize_lab(&config.lab_history_path)?)?
+                ),
+                LabCommands::Optimize { profile, live } => println!(
+                    "{}",
+                    serde_json::to_string_pretty(&optimize_latest(&config, profile, !live)?)?
+                ),
+            }
+            Ok(())
+        }
         Commands::Daemon { command } => {
             let config = Config::load_or_default(&cli.config)?;
             match command {
@@ -271,6 +318,15 @@ pub fn run() -> Result<()> {
         Commands::Backend { target, command } => {
             let config = Config::load_or_default(&cli.config)?;
             run_backend_command(&config, target, command)
+        }
+    }
+}
+
+impl From<LabTarget> for LabScenario {
+    fn from(value: LabTarget) -> Self {
+        match value {
+            LabTarget::Game => Self::Game,
+            LabTarget::Stream => Self::Stream,
         }
     }
 }
@@ -373,7 +429,6 @@ fn rollback_last(config: &Config, live: bool) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(&rollback)?);
     Ok(())
 }
-
 
 fn dscp_selector(
     process_path: Option<String>,

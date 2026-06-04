@@ -1,6 +1,6 @@
 use crate::config::{
-    DEFAULT_CONFIG, DEFAULT_FEEDBACK, DEFAULT_POLICY_STATE, DEFAULT_PROFILES_DIR, DEFAULT_RECEIPTS,
-    DEFAULT_STATE,
+    DEFAULT_CONFIG, DEFAULT_FEEDBACK, DEFAULT_LAB_HISTORY, DEFAULT_POLICY_STATE,
+    DEFAULT_PROFILES_DIR, DEFAULT_RECEIPTS, DEFAULT_STATE,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -13,6 +13,7 @@ pub struct RuntimePaths {
     pub receipts: PathBuf,
     pub feedback: PathBuf,
     pub policy_state: PathBuf,
+    pub lab_history: PathBuf,
     pub profiles_dir: PathBuf,
 }
 
@@ -37,6 +38,7 @@ impl RuntimePaths {
             receipts: root.join(DEFAULT_RECEIPTS),
             feedback: root.join(DEFAULT_FEEDBACK),
             policy_state: root.join(DEFAULT_POLICY_STATE),
+            lab_history: root.join(DEFAULT_LAB_HISTORY),
             profiles_dir: root.join(DEFAULT_PROFILES_DIR),
             root,
         }
@@ -55,13 +57,14 @@ impl RuntimePaths {
             .join(format!("{profile_id}.history.jsonl"))
     }
 
-    pub fn persistent_files(&self) -> [&Path; 5] {
+    pub fn persistent_files(&self) -> [&Path; 6] {
         [
             &self.config,
             &self.learner_state,
             &self.receipts,
             &self.feedback,
             &self.policy_state,
+            &self.lab_history,
         ]
     }
 }
@@ -90,6 +93,10 @@ mod tests {
         assert_eq!(
             paths.policy_state,
             PathBuf::from("runtime").join(DEFAULT_POLICY_STATE)
+        );
+        assert_eq!(
+            paths.lab_history,
+            PathBuf::from("runtime").join(DEFAULT_LAB_HISTORY)
         );
         assert_eq!(
             paths.policy_profile_history("game_boost"),

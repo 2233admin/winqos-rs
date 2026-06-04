@@ -4,6 +4,7 @@
 /winqos-receipts.jsonl
 /winqos-feedback.jsonl
 /winqos-policy-state.json
+/winqos-lab-history.jsonl
 /profiles/*.current.json
 /profiles/*.best.json
 /profiles/*.history.jsonl

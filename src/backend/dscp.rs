@@ -3,7 +3,7 @@ use super::{
 };
 use crate::model::TrafficClass;
 use crate::policy::{ActionSelector, ActionValue, BackendKind, PolicyAction, PolicyActionKind};
-use crate::receipt::{Receipt, RollbackReceipt};
+use crate::receipt::{Receipt, ReceiptStatus, RollbackReceipt};
 use anyhow::{Result, anyhow};
 use std::collections::BTreeMap;
 use std::process::Command;
@@ -145,12 +145,23 @@ impl Backend for LocalDscpBackend {
 
     fn remove(&self, action_id: &str) -> Result<RollbackReceipt> {
         let policy_name = policy_name(action_id);
-        if !self.dry_run {
-            if !is_elevated().unwrap_or(false) {
-                return Err(anyhow!("local DSCP remove requires an elevated shell"));
-            }
-            run_powershell(&remove_script(&policy_name))?;
+        if self.dry_run {
+            return Ok(RollbackReceipt {
+                id: format!("dry-run-remove.{action_id}"),
+                action_id: action_id.into(),
+                backend: BackendKind::LocalDscp,
+                status: ReceiptStatus::DryRun,
+                created_unix: crate::learning::now_unix(),
+                details: BTreeMap::from([
+                    ("policy_name".into(), policy_name.clone()),
+                    ("remove_script".into(), remove_script(&policy_name)),
+                ]),
+            });
         }
+        if !is_elevated().unwrap_or(false) {
+            return Err(anyhow!("local DSCP remove requires an elevated shell"));
+        }
+        run_powershell(&remove_script(&policy_name))?;
         let mut receipt = RollbackReceipt::removed(
             format!("removed.{action_id}"),
             action_id,
@@ -382,6 +393,16 @@ mod tests {
         assert_eq!(receipt.status, ReceiptStatus::DryRun);
         assert!(receipt.details["apply_script"].contains("New-NetQosPolicy"));
         assert!(receipt.rollback.ready);
+    }
+
+    #[test]
+    fn dry_run_remove_returns_dry_run_status() {
+        let backend = LocalDscpBackend::dry_run();
+
+        let receipt = backend.remove("game.exe").unwrap();
+
+        assert_eq!(receipt.status, ReceiptStatus::DryRun);
+        assert!(receipt.details["remove_script"].contains("Remove-NetQosPolicy"));
     }
 
     #[test]

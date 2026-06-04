@@ -8,6 +8,7 @@ pub const DEFAULT_STATE: &str = "winqos-state.json";
 pub const DEFAULT_RECEIPTS: &str = "winqos-receipts.jsonl";
 pub const DEFAULT_FEEDBACK: &str = "winqos-feedback.jsonl";
 pub const DEFAULT_POLICY_STATE: &str = "winqos-policy-state.json";
+pub const DEFAULT_LAB_HISTORY: &str = "winqos-lab-history.jsonl";
 pub const DEFAULT_PROFILES_DIR: &str = "profiles";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +21,10 @@ pub struct Config {
     pub feedback_path: PathBuf,
     #[serde(default = "default_policy_state_path")]
     pub policy_state_path: PathBuf,
+    #[serde(default = "default_lab_history_path")]
+    pub lab_history_path: PathBuf,
+    #[serde(default = "default_profiles_dir")]
+    pub profiles_dir: PathBuf,
     pub interval_seconds: u64,
     pub candidate_timeout_seconds: u32,
     pub learning: LearningConfig,
@@ -79,6 +84,8 @@ impl Config {
             receipts_path: PathBuf::from(DEFAULT_RECEIPTS),
             feedback_path: PathBuf::from(DEFAULT_FEEDBACK),
             policy_state_path: PathBuf::from(DEFAULT_POLICY_STATE),
+            lab_history_path: PathBuf::from(DEFAULT_LAB_HISTORY),
+            profiles_dir: PathBuf::from(DEFAULT_PROFILES_DIR),
             interval_seconds: 5,
             candidate_timeout_seconds: 30,
             learning: LearningConfig {
@@ -154,6 +161,14 @@ fn default_policy_state_path() -> PathBuf {
     PathBuf::from(DEFAULT_POLICY_STATE)
 }
 
+fn default_lab_history_path() -> PathBuf {
+    PathBuf::from(DEFAULT_LAB_HISTORY)
+}
+
+fn default_profiles_dir() -> PathBuf {
+    PathBuf::from(DEFAULT_PROFILES_DIR)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,6 +185,8 @@ mod tests {
             config.policy_state_path,
             PathBuf::from(DEFAULT_POLICY_STATE)
         );
+        assert_eq!(config.lab_history_path, PathBuf::from(DEFAULT_LAB_HISTORY));
+        assert_eq!(config.profiles_dir, PathBuf::from(DEFAULT_PROFILES_DIR));
         assert_eq!(config.backends.routerqosd.host, "192.168.1.1");
         assert_eq!(config.backends.routerqosd.port, 22);
         assert_eq!(config.backends.routerqosd.user, "root");

@@ -6,6 +6,7 @@ pub mod collector;
 pub mod config;
 pub mod daemon;
 pub mod feedback;
+pub mod lab;
 pub mod learning;
 pub mod model;
 pub mod petscii;
@@ -20,6 +21,7 @@ pub use autopilot::{AutopilotDecision, ProfileScore, decide_autopilot};
 pub use config::{Config, DEFAULT_CONFIG, DEFAULT_STATE};
 pub use daemon::{DaemonOptions, DaemonReport, InstallPlan};
 pub use feedback::{FeedbackEvent, FeedbackEventKind, FeedbackState};
+pub use lab::{LabMetrics, LabReport, LabScenario, OptimizerDecision};
 pub use model::{
     BackendReport, ClassifiedConnection, ConnectionSample, RouterCandidate, RunReport, TrafficClass,
 };
