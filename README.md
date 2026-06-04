@@ -2,6 +2,9 @@
 
 Open-source Windows network optimization engine and traffic-classification agent.
 
+Squeeze every usable millisecond out of Windows networking, without hiding what
+changed.
+
 `winqos-rs` is not a cFosSpeed clone yet. It is the control plane for one:
 
 - observe Windows process connections
@@ -9,10 +12,10 @@ Open-source Windows network optimization engine and traffic-classification agent
 - learn repeat behavior over time in an auditable JSON state file
 - push routing/shaping hints to pluggable backends
 
-The goal is simple: keep games, livestreams, AI tools, browsers, and downloads
-from ruining each other. Steam can download without bulldozing your match.
-Tencent/Delta-style shooters can stay protected. Streaming upload can stay
-guarded while the rest of the machine keeps working.
+The goal is simple: squeeze the network until games, livestreams, AI tools,
+browsers, and downloads stop ruining each other. Steam can download without
+bulldozing your match. Tencent/Delta-style shooters can stay protected.
+Streaming upload can stay guarded while the rest of the machine keeps working.
 
 The first backend targets `router-qosd` on ASUSWRT/koolshare by refreshing dynamic
 `ipset` members. Other backends can target OpenWrt, Windows DSCP policies, WFP, or

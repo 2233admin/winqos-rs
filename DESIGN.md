@@ -6,15 +6,15 @@
 - **Who it is for:** Gamers, streamers, Steam users, Tencent/Delta-style shooter players, developers, AI users, and Windows power users who want lower latency and fewer stalls.
 - **Space/industry:** Network acceleration, game traffic optimization, livestream stability, download fairness, local QoS, Windows tuning.
 - **Project type:** CLI today, local dashboard later.
-- **Memorable thing:** A PETSCII overdrive console that squeezes network performance for games, streams, downloads, and work, while still showing receipts.
+- **Memorable thing:** A PETSCII overdrive console that squeezes every usable millisecond out of Windows networking for games, streams, downloads, and work, while still showing receipts.
 
 ## Positioning
 
 `winqos-rs` is not mainly a generic "performance control panel". That is too flat.
 The sharper promise is:
 
-> Make Windows traffic fight less, so games, streams, AI tools, and downloads can
-> run at the same time without the network turning into mud.
+> Squeeze the network until games, streams, AI tools, and downloads can run at
+> the same time without the connection turning into mud.
 
 The UI should feel like a small network acceleration machine. Users should see:
 
