@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-06-04T09:49:55.993Z",
-  "updatedAt": "2026-06-04T11:18:03.207Z",
+  "updatedAt": "2026-06-04T11:24:28.551Z",
   "briefPath": ".omc/ultragoal/brief.md",
   "goalsPath": ".omc/ultragoal/goals.json",
   "ledgerPath": ".omc/ultragoal/ledger.jsonl",
@@ -71,10 +71,13 @@
       "id": "G006-network-lab-and-optimizer",
       "title": "Network Lab And Optimizer",
       "objective": "Add lab baseline/run/report commands plus validation-gated policy optimizer that keeps better policies and rolls back worse candidates.",
-      "status": "pending",
-      "attempt": 0,
+      "status": "complete",
+      "attempt": 1,
       "createdAt": "2026-06-04T09:49:55.993Z",
-      "updatedAt": "2026-06-04T09:49:55.993Z"
+      "updatedAt": "2026-06-04T11:24:28.551Z",
+      "startedAt": "2026-06-04T11:18:24.130Z",
+      "completedAt": "2026-06-04T11:24:28.551Z",
+      "evidence": "Added Network Lab baseline/run/report commands, lab history JSONL, lab metrics/scoring, profile current/best/history optimizer files, and validation-gated optimizer that keeps better candidates and rejects same/worse candidates with dry-run rollback from stored receipts; cargo fmt --check passed; cargo build passed; cargo test passed 53 tests; cargo clippy --all-targets --all-features -- -D warnings passed; CLI smoke passed lab baseline, lab run game, lab report, lab optimize keep, and second lab optimize reject with dry-run rollback; commit d98583c."
     },
     {
       "id": "G007-final-quality-gate",
