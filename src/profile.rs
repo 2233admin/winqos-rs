@@ -2,6 +2,8 @@ use crate::model::TrafficClass;
 use crate::policy::{ActionSelector, BackendKind, PolicyAction};
 use crate::signal::SignalKind;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 
 pub const BUILTIN_PACK_SCHEMA_VERSION: u16 = 1;
 
@@ -27,6 +29,29 @@ impl ProfileId {
             Self::AiWorkLane => "ai_work_lane",
             Self::Normal => "normal",
             Self::Paused => "paused",
+        }
+    }
+}
+
+impl fmt::Display for ProfileId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for ProfileId {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "game_boost" | "game" => Ok(Self::GameBoost),
+            "stream_guard" | "stream" => Ok(Self::StreamGuard),
+            "steam_sink" | "steam" => Ok(Self::SteamSink),
+            "proxy_smart" | "proxy" => Ok(Self::ProxySmart),
+            "ai_work_lane" | "ai" | "work" => Ok(Self::AiWorkLane),
+            "normal" => Ok(Self::Normal),
+            "paused" | "pause" => Ok(Self::Paused),
+            _ => Err(format!("unknown profile: {value}")),
         }
     }
 }
@@ -88,9 +113,9 @@ pub fn builtin_profile_pack() -> ProfilePack {
                 "Game Boost",
                 "Protect active game and voice flows while demoting bulk transfer pressure.",
                 900,
-                0.78,
+                0.52,
                 vec![
-                    SignalRule::required(SignalKind::GameProcess, 0.55),
+                    SignalRule::required(SignalKind::GameProcess, 0.7),
                     SignalRule::weighted(SignalKind::UdpFlow, 0.2),
                     SignalRule::weighted(SignalKind::BulkDownload, 0.15),
                     SignalRule::weighted(SignalKind::ProxyProcess, 0.1),
@@ -121,7 +146,7 @@ pub fn builtin_profile_pack() -> ProfilePack {
                 "Stream Guard",
                 "Protect livestream upload and voice while keeping downloads behind it.",
                 820,
-                0.74,
+                0.5,
                 vec![
                     SignalRule::required(SignalKind::StreamProcess, 0.45),
                     SignalRule::weighted(SignalKind::UploadPressure, 0.35),
@@ -153,7 +178,7 @@ pub fn builtin_profile_pack() -> ProfilePack {
                 "Steam Sink",
                 "Treat Steam and launcher download traffic as background pressure.",
                 620,
-                0.68,
+                0.48,
                 vec![
                     SignalRule::required(SignalKind::BulkDownload, 0.6),
                     SignalRule::weighted(SignalKind::TcpConnection, 0.2),
@@ -173,7 +198,7 @@ pub fn builtin_profile_pack() -> ProfilePack {
                 "Proxy Smart",
                 "Keep proxy engines unmarked while preserving visible app intent.",
                 540,
-                0.62,
+                0.45,
                 vec![SignalRule::required(SignalKind::ProxyProcess, 0.65)],
                 vec![PolicyAction::observe_only(
                     "proxy_smart.observe_proxy",
@@ -187,7 +212,7 @@ pub fn builtin_profile_pack() -> ProfilePack {
                 "AI Work Lane",
                 "Protect coding and local AI work from bulk transfer contention.",
                 500,
-                0.62,
+                0.45,
                 vec![
                     SignalRule::required(SignalKind::AiWorkProcess, 0.5),
                     SignalRule::weighted(SignalKind::TcpConnection, 0.2),
@@ -306,5 +331,15 @@ mod tests {
             .unwrap();
 
         assert_eq!(paused.priority, max_priority);
+    }
+
+    #[test]
+    fn profile_id_parses_cli_aliases() {
+        assert_eq!(
+            "game_boost".parse::<ProfileId>().unwrap(),
+            ProfileId::GameBoost
+        );
+        assert_eq!("steam".parse::<ProfileId>().unwrap(), ProfileId::SteamSink);
+        assert!("wat".parse::<ProfileId>().is_err());
     }
 }

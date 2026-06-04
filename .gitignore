@@ -1,5 +1,11 @@
 /target/
 /winqos.json
 /winqos-state.json
+/winqos-receipts.jsonl
+/winqos-feedback.jsonl
+/winqos-policy-state.json
+/profiles/*.current.json
+/profiles/*.best.json
+/profiles/*.history.jsonl
 *.log
 *.tmp

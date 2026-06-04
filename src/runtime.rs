@@ -1,11 +1,9 @@
-use crate::config::{DEFAULT_CONFIG, DEFAULT_STATE};
+use crate::config::{
+    DEFAULT_CONFIG, DEFAULT_FEEDBACK, DEFAULT_POLICY_STATE, DEFAULT_PROFILES_DIR, DEFAULT_RECEIPTS,
+    DEFAULT_STATE,
+};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-
-pub const DEFAULT_RECEIPTS: &str = "winqos-receipts.jsonl";
-pub const DEFAULT_FEEDBACK: &str = "winqos-feedback.jsonl";
-pub const DEFAULT_POLICY_STATE: &str = "winqos-policy-state.json";
-pub const DEFAULT_PROFILES_DIR: &str = "profiles";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimePaths {

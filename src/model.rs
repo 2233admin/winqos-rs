@@ -1,3 +1,4 @@
+use crate::autopilot::AutopilotDecision;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -43,6 +44,7 @@ pub struct RunReport {
     pub updated_unix: u64,
     pub sample_count: usize,
     pub class_counts: BTreeMap<String, usize>,
+    pub autopilot: AutopilotDecision,
     pub candidate_count: usize,
     pub candidates: Vec<RouterCandidate>,
     pub backend: BackendReport,

@@ -1,7 +1,9 @@
+use crate::autopilot::decide_autopilot;
 use crate::backend::{dedupe_candidates, push_routerqosd};
 use crate::classifier::Classifier;
 use crate::collector::collect_windows_tcp_connections;
 use crate::config::Config;
+use crate::feedback::{load_feedback_state, save_feedback_state};
 use crate::learning::{load_state, now_unix, save_state, update_learning};
 use crate::model::{BackendReport, ClassifiedConnection, ConnectionSample, RunReport};
 use anyhow::{Context, Result, anyhow};
@@ -60,6 +62,20 @@ pub fn run_cycle_with_samples(
         update_learning(config, &mut state, item);
     }
     save_state(&config.state_path, &state)?;
+    let mut feedback = load_feedback_state(&config.policy_state_path)?;
+    let autopilot = decide_autopilot(&classified, &feedback, dry_run);
+    feedback.set_last_decision(
+        autopilot.profile,
+        autopilot.confidence,
+        autopilot
+            .actions
+            .iter()
+            .map(|action| action.id.clone())
+            .collect(),
+        autopilot.information.clone(),
+        now_unix(),
+    );
+    save_feedback_state(&config.policy_state_path, &feedback)?;
 
     let candidates = dedupe_candidates(
         classified
@@ -82,6 +98,7 @@ pub fn run_cycle_with_samples(
         updated_unix: now_unix(),
         sample_count: samples.len(),
         class_counts: class_counts(&classified),
+        autopilot,
         candidate_count: candidates.len(),
         candidates,
         backend,
@@ -103,25 +120,36 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    struct TempState {
-        path: std::path::PathBuf,
+    struct TempFiles {
+        paths: Vec<std::path::PathBuf>,
     }
 
-    impl Drop for TempState {
+    impl Drop for TempFiles {
         fn drop(&mut self) {
-            let _ = fs::remove_file(&self.path);
+            for path in &self.paths {
+                let _ = fs::remove_file(path);
+            }
         }
     }
 
-    fn temp_state_config() -> (Config, TempState) {
+    fn temp_state_config() -> (Config, TempFiles) {
         let mut config = Config::default_for_current_user();
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        config.state_path = std::env::temp_dir().join(format!("winqos-test-{unique}.json"));
-        let guard = TempState {
-            path: config.state_path.clone(),
+        let temp = std::env::temp_dir();
+        config.state_path = temp.join(format!("winqos-test-state-{unique}.json"));
+        config.policy_state_path = temp.join(format!("winqos-test-policy-{unique}.json"));
+        config.feedback_path = temp.join(format!("winqos-test-feedback-{unique}.jsonl"));
+        config.receipts_path = temp.join(format!("winqos-test-receipts-{unique}.jsonl"));
+        let guard = TempFiles {
+            paths: vec![
+                config.state_path.clone(),
+                config.policy_state_path.clone(),
+                config.feedback_path.clone(),
+                config.receipts_path.clone(),
+            ],
         };
         (config, guard)
     }
@@ -145,6 +173,10 @@ mod tests {
         let report = run_cycle_with_samples(&config, vec![sample("steam")], true).unwrap();
 
         assert_eq!(report.sample_count, 1);
+        assert_eq!(
+            report.autopilot.profile,
+            crate::profile::ProfileId::SteamSink
+        );
         assert_eq!(report.candidate_count, 1);
         assert_eq!(report.class_counts.get("bulk"), Some(&1));
         assert_eq!(report.backend.stdout, "backend disabled");

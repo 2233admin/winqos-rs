@@ -5,10 +5,21 @@ use std::path::{Path, PathBuf};
 
 pub const DEFAULT_CONFIG: &str = "winqos.json";
 pub const DEFAULT_STATE: &str = "winqos-state.json";
+pub const DEFAULT_RECEIPTS: &str = "winqos-receipts.jsonl";
+pub const DEFAULT_FEEDBACK: &str = "winqos-feedback.jsonl";
+pub const DEFAULT_POLICY_STATE: &str = "winqos-policy-state.json";
+pub const DEFAULT_PROFILES_DIR: &str = "profiles";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default = "default_state_path")]
     pub state_path: PathBuf,
+    #[serde(default = "default_receipts_path")]
+    pub receipts_path: PathBuf,
+    #[serde(default = "default_feedback_path")]
+    pub feedback_path: PathBuf,
+    #[serde(default = "default_policy_state_path")]
+    pub policy_state_path: PathBuf,
     pub interval_seconds: u64,
     pub candidate_timeout_seconds: u32,
     pub learning: LearningConfig,
@@ -65,6 +76,9 @@ impl Config {
         let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".to_string());
         Self {
             state_path: PathBuf::from(DEFAULT_STATE),
+            receipts_path: PathBuf::from(DEFAULT_RECEIPTS),
+            feedback_path: PathBuf::from(DEFAULT_FEEDBACK),
+            policy_state_path: PathBuf::from(DEFAULT_POLICY_STATE),
             interval_seconds: 5,
             candidate_timeout_seconds: 30,
             learning: LearningConfig {
@@ -124,6 +138,22 @@ impl Config {
     }
 }
 
+fn default_state_path() -> PathBuf {
+    PathBuf::from(DEFAULT_STATE)
+}
+
+fn default_receipts_path() -> PathBuf {
+    PathBuf::from(DEFAULT_RECEIPTS)
+}
+
+fn default_feedback_path() -> PathBuf {
+    PathBuf::from(DEFAULT_FEEDBACK)
+}
+
+fn default_policy_state_path() -> PathBuf {
+    PathBuf::from(DEFAULT_POLICY_STATE)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,6 +163,13 @@ mod tests {
         let config = Config::default_for_current_user();
 
         assert!(!config.backends.routerqosd.enabled);
+        assert_eq!(config.state_path, PathBuf::from(DEFAULT_STATE));
+        assert_eq!(config.receipts_path, PathBuf::from(DEFAULT_RECEIPTS));
+        assert_eq!(config.feedback_path, PathBuf::from(DEFAULT_FEEDBACK));
+        assert_eq!(
+            config.policy_state_path,
+            PathBuf::from(DEFAULT_POLICY_STATE)
+        );
         assert_eq!(config.backends.routerqosd.host, "192.168.1.1");
         assert_eq!(config.backends.routerqosd.port, 22);
         assert_eq!(config.backends.routerqosd.user, "root");
