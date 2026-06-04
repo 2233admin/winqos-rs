@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-06-04T09:49:55.993Z",
-  "updatedAt": "2026-06-04T10:44:47.883Z",
+  "updatedAt": "2026-06-04T11:01:56.791Z",
   "briefPath": ".omc/ultragoal/brief.md",
   "goalsPath": ".omc/ultragoal/goals.json",
   "ledgerPath": ".omc/ultragoal/ledger.jsonl",
@@ -35,10 +35,13 @@
       "id": "G003-autopilot-decisions",
       "title": "Autopilot Decisions",
       "objective": "Implement built-in autopilot packs, confidence scoring, profile selection, user feedback learning, and PETSCII CLI status/explain outputs in dry-run form.",
-      "status": "pending",
-      "attempt": 0,
+      "status": "complete",
+      "attempt": 1,
       "createdAt": "2026-06-04T09:49:55.993Z",
-      "updatedAt": "2026-06-04T09:49:55.993Z"
+      "updatedAt": "2026-06-04T11:01:56.791Z",
+      "startedAt": "2026-06-04T10:45:47.978Z",
+      "completedAt": "2026-06-04T11:01:56.791Z",
+      "evidence": "Implemented autopilot decisions with signal extraction, confidence scoring, built-in profile selection, feedback state/log learning, PETSCII status/explain outputs, and feedback CLI commands in dry-run form; fixed game-vs-download priority and tightened broad game token false positives; runtime files ignored in .gitignore; cargo fmt --check passed; cargo build passed; cargo test passed 36 tests; cargo clippy --all-targets --all-features -- -D warnings passed; CLI smoke passed init, run --once --dry-run, status, explain, feedback prefer ai_work_lane, and learned profile shift from steam_sink to ai_work_lane; commit 5866920."
     },
     {
       "id": "G004-local-and-router-backends",
