@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-06-04T09:49:55.993Z",
-  "updatedAt": "2026-06-04T11:10:08.985Z",
+  "updatedAt": "2026-06-04T11:18:03.207Z",
   "briefPath": ".omc/ultragoal/brief.md",
   "goalsPath": ".omc/ultragoal/goals.json",
   "ledgerPath": ".omc/ultragoal/ledger.jsonl",
@@ -59,10 +59,13 @@
       "id": "G005-daemon-safety-loop",
       "title": "Daemon Safety Loop",
       "objective": "Add always-on autopilot loop, boot/install planning surface, pause/resume/status controls, fail-closed mutation handling, receipts, and rollback behavior.",
-      "status": "pending",
-      "attempt": 0,
+      "status": "complete",
+      "attempt": 1,
       "createdAt": "2026-06-04T09:49:55.993Z",
-      "updatedAt": "2026-06-04T09:49:55.993Z"
+      "updatedAt": "2026-06-04T11:18:03.207Z",
+      "startedAt": "2026-06-04T11:10:36.761Z",
+      "completedAt": "2026-06-04T11:18:03.207Z",
+      "evidence": "Added daemon safety loop with daemon run --once/loop dry-run path, pause/resume/status controls, fail-closed policy pause on backend errors, receipt JSONL store, action receipts in RunReport, rollback --last using stored receipts, and non-mutating install-plan surface; autopilot paused state selects paused profile; cargo fmt --check passed; cargo build passed; cargo test passed 49 tests; cargo clippy --all-targets --all-features -- -D warnings passed; CLI smoke passed daemon run --once --dry-run with receipt, pause/status/resume, rollback --last, and install-plan with no live mutation; commit f78c45c."
     },
     {
       "id": "G006-network-lab-and-optimizer",
