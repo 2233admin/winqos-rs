@@ -2,140 +2,181 @@
 
 ## Product Context
 
-- **What this is:** An open-source Windows QoS learner and PC optimization suite core.
-- **Who it is for:** Windows power users, network operators, gamers, developers, and builders who want measurable latency and traffic control.
-- **Space/industry:** Local performance tooling, traffic shaping, network observability, Windows optimization.
+- **What this is:** An open-source Windows network optimization engine and traffic-shaping control plane.
+- **Who it is for:** Gamers, streamers, Steam users, Tencent/Delta-style shooter players, developers, AI users, and Windows power users who want lower latency and fewer stalls.
+- **Space/industry:** Network acceleration, game traffic optimization, livestream stability, download fairness, local QoS, Windows tuning.
 - **Project type:** CLI today, local dashboard later.
-- **Memorable thing:** This is not a one-click myth optimizer. It is an explainable, reversible Windows performance control console.
+- **Memorable thing:** A PETSCII overdrive console that squeezes network performance for games, streams, downloads, and work, while still showing receipts.
+
+## Positioning
+
+`winqos-rs` is not mainly a generic "performance control panel". That is too flat.
+The sharper promise is:
+
+> Make Windows traffic fight less, so games, streams, AI tools, and downloads can
+> run at the same time without the network turning into mud.
+
+The UI should feel like a small network acceleration machine. Users should see:
+
+- game profile active
+- Steam download demoted
+- Tencent/Delta-style shooter traffic protected
+- livestream upload guarded
+- Clash/Mihomo proxy traffic understood
+- every change visible and reversible
 
 ## Aesthetic Direction
 
-- **Direction:** Industrial telemetry console.
-- **Decoration level:** Intentional. Use thin grid lines, receipt strips, status marks, and queue bands. No decorative blobs, no gradients as identity.
-- **Mood:** Serious, technical, local-first, and inspectable. The interface should feel like it belongs next to packet counters and shell output.
-- **Reference posture:** Less consumer cleaner app, more network control room.
+- **Direction:** PETSCII Overdrive Console.
+- **Decoration level:** Expressive, but system-bound. The style comes from character grids, block graphics, reverse-video strips, score/HUD zones, and queue maps.
+- **Mood:** Sharp, retro-futuristic, technical, game-adjacent, and fast. It should feel like booting a custom cartridge that controls your packets.
+- **Reference posture:** PETSCII-inspired network HUD, not nostalgic wallpaper.
+- **Core rule:** The PETSCII layer must carry information. If a block, hatch, line, or glyph does not explain state, speed, risk, or priority, delete it.
+
+## PETSCII Rules
+
+PETSCII is useful here because it gives the product a native visual grammar:
+
+- grid-first composition
+- uppercase command language
+- block graphics for meters, maps, queue lanes, and packet flow
+- reverse-video states for active/selected/applied
+- sparse color with strong meaning
+- side HUD panels for inventory-like modules
+
+Use the style as an interface system, not a costume.
+
+Do:
+
+- draw queue lanes as character-grid maps
+- show game/stream/download profiles as HUD inventory slots
+- use block meters for latency, throughput, and queue pressure
+- use all-caps labels for machine state
+- keep tables readable with modern spacing underneath the pixel shell
+
+Do not:
+
+- use random retro glyphs as filler
+- make body copy hard to read
+- turn every panel into a fake game screen
+- bury safety, rollback, or backend status under decoration
+- use purple gradients, soft SaaS cards, or cleaner-app gloss
 
 ## Typography
 
-- **Display/Hero:** Archivo - compact, mechanical, and strong enough for command surfaces.
-- **Body:** Instrument Sans - readable for docs and settings without feeling generic.
-- **UI/Labels:** Instrument Sans Medium with small uppercase labels for machine state.
-- **Data/Tables:** IBM Plex Mono - clear tabular data, commands, counters, ports, and receipts.
+- **Display/Hero:** Silkscreen - use only for short PETSCII-style titles, HUD headers, score labels, and profile names.
+- **Body:** IBM Plex Mono - primary product UI text, readable enough for dense technical surfaces.
+- **Docs/Long copy:** Instrument Sans - use in README pages and documentation where paragraphs need air.
+- **Data/Tables:** IBM Plex Mono with tabular numbers.
 - **Code:** JetBrains Mono.
-- **Loading:** Use Google Fonts for public web previews:
-  `https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap`
+- **Future self-host option:** Cozette or C64-style bitmap font for dashboard chrome only, never for long body text.
+- **Loading:** Public previews can use:
+  `https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap`
 - **Scale:**
-  - `display`: 40px / 1.0
-  - `h1`: 32px / 1.1
-  - `h2`: 24px / 1.16
-  - `h3`: 18px / 1.25
-  - `body`: 15px / 1.55
-  - `small`: 13px / 1.45
-  - `label`: 11px / 1.2, uppercase, 0.08em letter spacing
+  - `display`: 44px / 1.0, Silkscreen, uppercase
+  - `h1`: 30px / 1.1, IBM Plex Mono 600
+  - `h2`: 20px / 1.15, Silkscreen or IBM Plex Mono 600
+  - `h3`: 16px / 1.25, IBM Plex Mono 600
+  - `body`: 14px / 1.55, IBM Plex Mono
+  - `small`: 12px / 1.45
+  - `hud`: 11px / 1.2, uppercase, 0.08em letter spacing
   - `mono`: 13px / 1.45
 
 ## Color
 
-- **Approach:** Restrained, functional, and state-driven. Color means network state, not decoration.
-- **Primary:** `#1FA463` circuit green. Use for healthy, applied, optimized, active.
-- **Secondary:** `#168AAD` meter cyan. Use for measurement, samples, graph focus, neutral telemetry.
-- **Accent:** `#E0A11B` warning amber. Use for optional, experimental, and attention states.
-- **Danger:** `#D84C3F` hard red. Use only for destructive, banned, failed, or rollback-needed states.
-- **Background:** `#F6F8F5` lab white.
-- **Surface:** `#FFFFFF` primary panel.
-- **Surface 2:** `#EEF2ED` secondary panel and table header.
-- **Ink:** `#151A17` primary text.
-- **Muted:** `#626D66` secondary text.
-- **Line:** `#CBD4CD` borders and grid lines.
-- **Dark mode background:** `#0F1311`.
-- **Dark mode surface:** `#171D19`.
-- **Dark mode surface 2:** `#202820`.
-- **Dark mode ink:** `#E7EEE9`.
-- **Dark mode muted:** `#98A69D`.
-- **Dark mode line:** `#313B34`.
-- **Semantic:** success `#1FA463`, warning `#E0A11B`, error `#D84C3F`, info `#168AAD`.
-- **Dark mode strategy:** Redesign surfaces, not just invert. Keep saturation 10-15% lower except for live status dots.
+- **Approach:** Phosphor-first, game-state second. Default to monochrome green-on-black, then add tiny alert colors.
+- **CRT Black:** `#020403` main background.
+- **Phosphor:** `#A7D36B` primary ink, active state, healthy acceleration.
+- **Deep Phosphor:** `#6F9848` secondary glyphs, inactive meters, old-screen shadows.
+- **Grid:** `#26351F` grid lines and low-contrast map dots.
+- **Panel Black:** `#070B08` panel surface.
+- **Reverse Video:** `#A7D36B` background with `#020403` text.
+- **Boost Cyan:** `#59C7D6` game/stream protection and measured speed gain.
+- **Warning Amber:** `#E6B450` experimental, queue pressure, attention.
+- **Drop Red:** `#E05D48` failed backend, packet loss, destructive action.
+- **Text Muted:** `#7FA35B`.
+- **Light mode:** Not a first-class identity. If required, use a pale terminal print mode for docs only.
+- **Semantic:** success `#A7D36B`, info `#59C7D6`, warning `#E6B450`, error `#E05D48`.
 
 ## Spacing
 
 - **Base unit:** 4px.
-- **Density:** Compact. This product is for repeated scanning, not hero-page lounging.
-- **Scale:** 2xs(2), xs(4), sm(8), md(16), lg(24), xl(32), 2xl(48), 3xl(64).
+- **Density:** Compact. This is a tactical console for quick decisions.
+- **Grid:** 8px visual grid over a 4px spacing system.
+- **Scale:** 2xs(2), xs(4), sm(8), md(16), lg(24), xl(32), 2xl(48).
 
 ## Layout
 
-- **Approach:** Grid-disciplined for app surfaces, editorial only for docs and release pages.
-- **Primary dashboard:** Left module rail, top command/status bar, dense main grid, right receipt panel.
-- **Grid:** 12 columns desktop, 6 columns tablet, 1 column mobile.
-- **Max content width:** 1440px for app dashboard, 860px for docs.
-- **Border radius:** sm 3px, md 6px, lg 8px, full 9999px. Never use large bubbly cards.
-- **Cards:** Use only for repeated modules and status units. Do not nest cards inside cards.
-- **Tables:** Sticky header, tabular numbers, compact rows, visible active row state.
+- **Approach:** Game HUD plus operator dashboard.
+- **Primary dashboard:** Main packet map on the left, speed/weapon-style profile HUD on the right, command log at the bottom.
+- **Grid:** 40-column PETSCII-inspired internal rhythm, mapped to responsive CSS grid.
+- **Desktop:** 12 columns with fixed HUD rail.
+- **Tablet:** 6 columns with HUD below map.
+- **Mobile:** stacked panels, still dark, still character-grid.
+- **Max content width:** 1440px for app dashboard, 900px for docs.
+- **Border radius:** 0px for PETSCII panels, 4px maximum for modern controls. This project should not look bubbly.
+- **Panel shape:** Use square frames, double-line borders, reverse-video headers, and dense gutters.
 
 ## Components
 
-- **Module tile:** State badge, last action, rollback availability, risk tier, primary command.
-- **Receipt panel:** Append-only action log with timestamp, command, result, and rollback link.
-- **Traffic class row:** Class name, process count, candidates, current queue, packet hint, confidence.
-- **Risk tier badge:** Safe green, optional cyan, experimental amber, banned red.
-- **Command buttons:** Text plus icon when command intent matters. Use direct verbs: Inspect, Apply, Remove, Explain.
-- **Charts:** Thin strokes, no filled gradient areas. Show queue counters and latency samples with labeled thresholds.
+- **Packet map:** A character-grid panel showing app flows, queue lanes, bottleneck, and backend destination.
+- **Boost HUD:** Current mode, gain estimate, protected apps, demoted bulk flows, rollback state.
+- **Profile slots:** Game, Stream, Download, Work, AI, Custom. They behave like inventory items, not generic cards.
+- **Weapon meter:** Use the "weapon" metaphor for active acceleration profile: game boost, stream guard, bulk sink.
+- **Traffic rows:** Process, class, remote, confidence, action, rollback.
+- **Receipt log:** Bottom terminal strip with exact command, timestamp, result, and undo path.
+- **Risk badge:** SAFE, OPTIONAL, EXPERIMENTAL, BANNED. Use reverse-video labels.
+- **Buttons:** Rectangular command blocks. Verbs: BOOST, GUARD, DEMOTE, INSPECT, APPLY, EXPLAIN, ROLLBACK.
+- **Charts:** Block meters and stepped lines. Avoid smooth finance-style charts.
 
 ## Motion
 
-- **Approach:** Minimal-functional.
-- **Easing:** enter `cubic-bezier(.16,1,.3,1)`, exit `cubic-bezier(.7,0,.84,0)`, move `cubic-bezier(.45,0,.2,1)`.
-- **Duration:** micro 70ms, short 160ms, medium 260ms.
-- **Rules:** Animate state changes and panel entry only. Do not animate charts for decoration after first render.
+- **Approach:** Intentional retro-machine motion.
+- **Allowed:** cursor blink, scanline pass, meter fill, row flash after apply, packet blip along lane.
+- **Avoid:** bouncy easing, decorative looping particles, smooth liquid charts.
+- **Easing:** step-like for HUD state, `steps(4, end)` where it fits; otherwise `cubic-bezier(.16,1,.3,1)`.
+- **Duration:** micro 80ms, short 180ms, medium 320ms.
+- **Reduced motion:** Disable scanline and packet blips, keep instant state changes.
 
 ## Safe Choices
 
-- **Dense dashboard layout:** Users need to scan counters, modules, and receipts quickly.
-- **Monospace data lane:** Ports, PIDs, queue IDs, commands, and timestamps must align.
-- **State-driven color:** QoS tools are control surfaces. Color must mean something.
+- **Dark console baseline:** Network optimization users expect a technical surface and tolerate density.
+- **State-driven color:** Games, streams, downloads, and proxies need clear priority status.
+- **Monospace-first UI:** Processes, ports, latencies, and queue IDs must align.
 
 ## Risks
 
-- **No soft SaaS polish:** The UI may feel harder than mainstream tools, but it will earn trust with technical users.
-- **Compact density:** It sacrifices marketing friendliness for operator speed.
-- **Amber experimental lane:** Experimental features are visible instead of hidden. This creates tension, but it stops the project from lying about risk.
+- **PETSCII identity:** It will repel generic enterprise users, but it gives the project a face and a memory hook.
+- **Game metaphor:** "Weapon/profile/HUD" can sound playful, but this product is literally fighting latency and bufferbloat. The metaphor fits if the data stays honest.
+- **Mostly dark UI:** Great for gaming and operator feel, weaker for long docs. Solve with separate docs styling, not by watering down the dashboard.
 
 ## CSS Tokens
 
 ```css
 :root {
-  --font-display: "Archivo", sans-serif;
-  --font-body: "Instrument Sans", sans-serif;
-  --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
+  --font-display: "Silkscreen", "IBM Plex Mono", monospace;
+  --font-ui: "IBM Plex Mono", monospace;
+  --font-docs: "Instrument Sans", sans-serif;
+  --font-code: "JetBrains Mono", monospace;
 
-  --bg: #f6f8f5;
-  --surface: #ffffff;
-  --surface-2: #eef2ed;
-  --ink: #151a17;
-  --muted: #626d66;
-  --line: #cbd4cd;
-  --primary: #1fa463;
-  --secondary: #168aad;
-  --warning: #e0a11b;
-  --danger: #d84c3f;
+  --crt-black: #020403;
+  --panel: #070b08;
+  --phosphor: #a7d36b;
+  --phosphor-dim: #6f9848;
+  --grid: #26351f;
+  --boost: #59c7d6;
+  --warning: #e6b450;
+  --drop: #e05d48;
+  --reverse-bg: #a7d36b;
+  --reverse-ink: #020403;
 
-  --radius-sm: 3px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-panel: 0;
+  --radius-control: 4px;
   --space-1: 4px;
   --space-2: 8px;
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
-}
-
-[data-theme="dark"] {
-  --bg: #0f1311;
-  --surface: #171d19;
-  --surface-2: #202820;
-  --ink: #e7eee9;
-  --muted: #98a69d;
-  --line: #313b34;
 }
 ```
 
@@ -144,5 +185,6 @@
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-06-04 | Initial design system created | Created by design consultation from the winqos-rs README and roadmap. |
-| 2026-06-04 | Chose industrial telemetry console | The product must feel measurable, local, reversible, and serious. |
-| 2026-06-04 | Rejected SaaS gradients and soft cleaner-app styling | The project should not look like fake one-click PC optimizer software. |
+| 2026-06-04 | Repositioned from generic performance console to network optimization engine | The user clarified that the core promise is network speed and latency for games, livestreams, downloads, and work. |
+| 2026-06-04 | Switched visual identity to PETSCII Overdrive Console | PETSCII gives the project a distinctive game-adjacent interface language with grid, HUD, block meters, and command-state clarity. |
+| 2026-06-04 | Kept receipts and rollback as part of the visual language | The product can be aggressive about optimization only if every action stays visible and reversible. |

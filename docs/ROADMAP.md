@@ -1,8 +1,9 @@
 # Roadmap
 
-`winqos-rs` starts as a network QoS learner. The larger goal is a Windows PC
-optimization suite with the same discipline as a good playbook: visible changes,
-scoped risk, rollback, and receipts.
+`winqos-rs` starts as a network QoS learner. The larger goal is a Windows network
+optimization suite for games, livestreams, downloads, AI tools, and daily work,
+with the same discipline as a good playbook: visible changes, scoped risk,
+rollback, and receipts.
 
 It should not become a pile of registry myths.
 
@@ -45,6 +46,15 @@ Next:
 - WFP marking backend
 - WinDivert local scheduling experiment
 
+### Game And Streaming Profiles
+
+- protect latency-sensitive game flows
+- guard livestream upload from bulk traffic
+- demote Steam and launcher downloads when a match or stream is active
+- detect proxy-routed game traffic without marking the proxy engine itself as bulk
+- expose per-profile receipts: what was boosted, what was demoted, and why
+- support Steam, launcher downloads, Tencent/Delta-style shooters, voice chat, and browser streams as first-class scenarios
+
 ### Startup And Services
 
 - measure startup impact
@@ -86,8 +96,11 @@ Next:
 ### Dashboard
 
 - local web UI
+- PETSCII-inspired network HUD
 - read-only by default
 - module cards with status, apply, rollback, and details
+- game/stream/download profile slots
+- block meters for latency, queue pressure, and candidate flow count
 - no remote telemetry
 
 ## GitHub Milestones
@@ -97,7 +110,7 @@ Next:
 3. Backend SDK: routerqosd, OpenWrt, DSCP adapters
 4. Network Lab: reproducible latency and throughput benchmarks
 5. Suite Core: module registry, receipts, rollback contracts
-6. UI: local dashboard
+6. UI: PETSCII local dashboard
 7. Experimental Driver Track: WFP/WinDivert prototypes with hard opt-in
 
 ## Non-Goals

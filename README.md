@@ -1,6 +1,6 @@
 # winqos-rs
 
-Open-source Windows QoS learner and traffic-classification agent.
+Open-source Windows network optimization engine and traffic-classification agent.
 
 `winqos-rs` is not a cFosSpeed clone yet. It is the control plane for one:
 
@@ -8,6 +8,11 @@ Open-source Windows QoS learner and traffic-classification agent.
 - classify traffic as interactive, normal, bulk, or ignored
 - learn repeat behavior over time in an auditable JSON state file
 - push routing/shaping hints to pluggable backends
+
+The goal is simple: keep games, livestreams, AI tools, browsers, and downloads
+from ruining each other. Steam can download without bulldozing your match.
+Tencent/Delta-style shooters can stay protected. Streaming upload can stay
+guarded while the rest of the machine keeps working.
 
 The first backend targets `router-qosd` on ASUSWRT/koolshare by refreshing dynamic
 `ipset` members. Other backends can target OpenWrt, Windows DSCP policies, WFP, or
@@ -131,15 +136,17 @@ Future learning work:
 
 ## Roadmap
 
-The bigger target is a Windows PC optimization suite:
+The bigger target is a Windows network optimization suite:
 
 - network QoS
+- game and livestream boost profiles
+- Steam/download demotion
 - startup and service hygiene
 - power and latency profiles
 - proxy and DNS sanity checks
 - storage cache hygiene
 - receipts, status, and rollback
-- local dashboard
+- PETSCII-style local dashboard
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 
