@@ -9,6 +9,14 @@ use std::collections::BTreeSet;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+pub mod dscp;
+pub mod routerqosd;
+pub mod windivert_lab;
+
+pub use dscp::LocalDscpBackend;
+pub use routerqosd::RouterQosdBackend;
+pub use windivert_lab::WinDivertLabBackend;
+
 pub trait Backend {
     fn name(&self) -> &'static str;
     fn capabilities(&self) -> BackendCapabilities;
