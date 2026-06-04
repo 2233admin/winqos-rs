@@ -13,8 +13,9 @@ use crate::policy::{ActionSelector, BackendKind, PolicyAction};
 use crate::profile::ProfileId;
 use crate::receipt::{append_rollback_receipt, last_apply_receipt};
 use crate::runner::{init_config, print_sample_table, run_cycle};
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::{Parser, Subcommand, ValueEnum};
+use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -85,6 +86,22 @@ enum Commands {
         target: BackendTarget,
         #[command(subcommand)]
         command: BackendCommands,
+    },
+    Quickstart {
+        #[arg(long)]
+        live: bool,
+        #[arg(long, default_value = "3")]
+        cycles: u32,
+        #[arg(long)]
+        enable_router: bool,
+        #[arg(long)]
+        router_host: Option<String>,
+        #[arg(long)]
+        router_user: Option<String>,
+        #[arg(long)]
+        interval: Option<u64>,
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -348,6 +365,153 @@ pub fn run() -> Result<()> {
             let config = Config::load_or_default(&cli.config)?;
             run_backend_command(&config, target, command)
         }
+        Commands::Quickstart {
+            live,
+            cycles,
+            enable_router,
+            router_host,
+            router_user,
+            interval,
+            json,
+        } => {
+            let config = quickstart_prepare_config(
+                &cli.config,
+                enable_router,
+                router_host,
+                router_user,
+                interval,
+            )?;
+            let report = run_daemon(
+                &config,
+                &DaemonOptions {
+                    once: false,
+                    dry_run: !live,
+                    cycles: Some(cycles.max(1)),
+                },
+            )?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                let install_plan = build_install_plan(&cli.config, &config);
+                println!(
+                    "quickstart: plan={}\n{}",
+                    install_plan.service_name,
+                    serde_json::to_string_pretty(&install_plan)?
+                );
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into())
+                );
+            }
+            Ok(())
+        }
+    }
+}
+
+fn quickstart_prepare_config(
+    path: &PathBuf,
+    enable_router: bool,
+    router_host: Option<String>,
+    router_user: Option<String>,
+    interval_seconds: Option<u64>,
+) -> Result<Config> {
+    if !path.exists() {
+        init_config(path, true)?;
+    }
+
+    let mut config = Config::load_or_default(path)?;
+    let mut modified = false;
+
+    if let Some(interval) = interval_seconds {
+        if config.interval_seconds != interval.max(2) {
+            config.interval_seconds = interval.max(2);
+            modified = true;
+        }
+    }
+
+    if enable_router || router_host.is_some() || router_user.is_some() {
+        if !config.backends.routerqosd.enabled {
+            config.backends.routerqosd.enabled = true;
+            modified = true;
+        }
+        if let Some(host) = router_host {
+            if config.backends.routerqosd.host != host {
+                config.backends.routerqosd.host = host;
+                modified = true;
+            }
+        }
+        if let Some(user) = router_user {
+            if config.backends.routerqosd.user != user {
+                config.backends.routerqosd.user = user;
+                modified = true;
+            }
+        }
+    }
+
+    if modified {
+        fs::write(path, serde_json::to_string_pretty(&config)? + "\n")
+            .with_context(|| format!("failed to write config {}", path.display()))?;
+    }
+
+    Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn quickstart_can_enable_router_defaults() -> Result<()> {
+        let mut dir = std::env::temp_dir();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        dir.push(format!("winqos-cli-quickstart-{stamp}.json"));
+        let config_path = dir;
+
+        let mut config = Config::default_for_current_user();
+        config.backends.routerqosd.enabled = false;
+        fs::write(&config_path, serde_json::to_string_pretty(&config)? + "\n")?;
+
+        let applied = quickstart_prepare_config(
+            &config_path,
+            true,
+            Some("10.0.0.1".to_string()),
+            Some("root2".to_string()),
+            Some(4),
+        )?;
+
+        let _ = fs::remove_file(&config_path);
+        assert!(applied.backends.routerqosd.enabled);
+        assert_eq!(applied.backends.routerqosd.host, "10.0.0.1");
+        assert_eq!(applied.backends.routerqosd.user, "root2");
+        assert_eq!(applied.interval_seconds, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn quickstart_preserves_defaults_without_flags() -> Result<()> {
+        let mut dir = std::env::temp_dir();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            + 1;
+        dir.push(format!("winqos-cli-quickstart-nochange-{stamp}.json"));
+        let config_path = dir;
+
+        let mut config = Config::default_for_current_user();
+        config.backends.routerqosd.enabled = false;
+        fs::write(&config_path, serde_json::to_string_pretty(&config)? + "\n")?;
+
+        let applied = quickstart_prepare_config(&config_path, false, None, None, None)?;
+
+        let _ = fs::remove_file(&config_path);
+        assert!(!applied.backends.routerqosd.enabled);
+        assert_eq!(applied.backends.routerqosd.host, "192.168.1.1");
+        Ok(())
     }
 }
 

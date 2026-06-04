@@ -73,11 +73,20 @@ Not implemented yet:
 ```powershell
 cargo build
 target\debug\winqos-rs.exe init --force
+target\debug\winqos-rs.exe quickstart --cycles 4 --enable-router --router-host 192.168.1.1
 target\debug\winqos-rs.exe sample
 target\debug\winqos-rs.exe run --once --dry-run
 target\debug\winqos-rs.exe status
 target\debug\winqos-rs.exe explain
 ```
+
+`quickstart` is the zero-friction flow for “装上就能跑”:
+
+```powershell
+target\debug\winqos-rs.exe quickstart [--cycles N] [--live] [--enable-router] [--router-host X] [--router-user Y] [--interval Z] [--json]
+```
+
+默认是 `--dry-run`，会先把配置补齐（可选打开路由器端 backend）后做一段固定周期试运行。加 `--live` 才会尝试真实写入 DSCP / 路由后端。
 
 The default config is `winqos.json`. New configs start with all mutating backends
 disabled. Enable a backend only after checking the generated config.
