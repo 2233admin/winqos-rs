@@ -274,10 +274,10 @@ impl Config {
             },
             backends: BackendConfig {
                 routerqosd: RouterQosdConfig {
-                    enabled: true,
-                    host: "192.168.50.1".into(),
-                    port: 1024,
-                    user: "curry".into(),
+                    enabled: false,
+                    host: "192.168.1.1".into(),
+                    port: 22,
+                    user: "root".into(),
                     key_path: PathBuf::from(format!("{home}\\.ssh\\id_ed25519")),
                     ssh_path: PathBuf::from("ssh.exe"),
                 },

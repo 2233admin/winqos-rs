@@ -39,6 +39,7 @@ Current MVP:
 - routerqosd SSH backend
 - dry-run mode
 - JSON reports
+- safe public defaults: no backend is enabled until configured
 
 Not implemented yet:
 
@@ -59,6 +60,23 @@ target\debug\winqos-rs.exe run --once
 ```
 
 The default config is `winqos.json`. The learner state is `winqos-state.json`.
+New configs start with all mutating backends disabled. Enable a backend only
+after checking the generated config.
+
+For a routerqosd backend, edit:
+
+```json
+{
+  "backends": {
+    "routerqosd": {
+      "enabled": true,
+      "host": "192.168.1.1",
+      "port": 22,
+      "user": "root"
+    }
+  }
+}
+```
 
 ## Traffic Classes
 
@@ -113,13 +131,17 @@ Future learning work:
 
 ## Roadmap
 
-1. Router backend hardening
-2. Windows service packaging
-3. DSCP backend
-4. WFP backend for marking/filtering
-5. WinDivert backend for local throttle/queue experiments
-6. Cross-router backend interface
-7. Minimal local dashboard
+The bigger target is a Windows PC optimization suite:
+
+- network QoS
+- startup and service hygiene
+- power and latency profiles
+- proxy and DNS sanity checks
+- storage cache hygiene
+- receipts, status, and rollback
+- local dashboard
+
+See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Safety
 
