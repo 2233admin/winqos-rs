@@ -17,6 +17,14 @@ pub use dscp::LocalDscpBackend;
 pub use routerqosd::RouterQosdBackend;
 pub use windivert_lab::WinDivertLabBackend;
 
+pub fn backend_for_kind(config: &Config, kind: BackendKind, dry_run: bool) -> Box<dyn Backend> {
+    match kind {
+        BackendKind::LocalDscp => Box::new(LocalDscpBackend::new(dry_run)),
+        BackendKind::RouterQosd => Box::new(RouterQosdBackend::new(config.clone(), dry_run)),
+        BackendKind::WinDivertLab => Box::new(WinDivertLabBackend),
+    }
+}
+
 pub trait Backend {
     fn name(&self) -> &'static str;
     fn capabilities(&self) -> BackendCapabilities;

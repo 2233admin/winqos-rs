@@ -1,4 +1,4 @@
-use crate::backend::{Backend, LocalDscpBackend, RouterQosdBackend, WinDivertLabBackend};
+use crate::backend::{Backend, LocalDscpBackend, backend_for_kind};
 use crate::collector::collect_windows_tcp_connections;
 use crate::config::{Config, DEFAULT_CONFIG};
 use crate::daemon::{DaemonOptions, install_plan as build_install_plan, run_daemon};
@@ -261,7 +261,10 @@ pub fn run() -> Result<()> {
             println!("{}", render_status(&policy));
             Ok(())
         }
-        Commands::Rollback { last: _, live } => {
+        Commands::Rollback { last, live } => {
+            if !last {
+                bail!("rollback currently requires --last");
+            }
             let config = Config::load_or_default(&cli.config)?;
             rollback_last(&config, live)
         }
@@ -398,25 +401,9 @@ fn run_backend_command(
 
 fn backend_for(config: &Config, target: BackendTarget, dry_run: bool) -> Box<dyn Backend> {
     match target {
-        BackendTarget::Dscp => Box::new(if dry_run {
-            LocalDscpBackend::dry_run()
-        } else {
-            LocalDscpBackend::live()
-        }),
-        BackendTarget::Routerqosd => Box::new(RouterQosdBackend::new(config.clone(), dry_run)),
-        BackendTarget::WindivertLab => Box::new(WinDivertLabBackend),
-    }
-}
-
-fn backend_for_kind(config: &Config, kind: BackendKind, dry_run: bool) -> Box<dyn Backend> {
-    match kind {
-        BackendKind::LocalDscp => Box::new(if dry_run {
-            LocalDscpBackend::dry_run()
-        } else {
-            LocalDscpBackend::live()
-        }),
-        BackendKind::RouterQosd => Box::new(RouterQosdBackend::new(config.clone(), dry_run)),
-        BackendKind::WinDivertLab => Box::new(WinDivertLabBackend),
+        BackendTarget::Dscp => backend_for_kind(config, BackendKind::LocalDscp, dry_run),
+        BackendTarget::Routerqosd => backend_for_kind(config, BackendKind::RouterQosd, dry_run),
+        BackendTarget::WindivertLab => backend_for_kind(config, BackendKind::WinDivertLab, dry_run),
     }
 }
 

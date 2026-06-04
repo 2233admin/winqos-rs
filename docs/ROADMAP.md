@@ -33,7 +33,12 @@ Current focus.
 - process connection sampling
 - traffic classification
 - online learner
+- automatic profile selection
+- DSCP-first local backend
 - routerqosd backend
+- dry-run receipts and rollback
+- Network Lab reports
+- validation-gated optimizer
 - dry-run reports
 
 Next:
@@ -42,7 +47,6 @@ Next:
 - per-process byte deltas
 - congestion feedback from queue counters
 - OpenWrt backend
-- Windows DSCP backend
 - WFP marking backend
 - WinDivert local scheduling experiment
 
@@ -112,6 +116,15 @@ Next:
 5. Suite Core: module registry, receipts, rollback contracts
 6. UI: PETSCII local dashboard
 7. Experimental Driver Track: WFP/WinDivert prototypes with hard opt-in
+
+Phase 1 CLI pieces now present:
+
+- `run --once --dry-run` with profile/confidence/actions
+- `status` and `explain` PETSCII console
+- `feedback`, `pause`, `resume`, and `rollback --last`
+- `backend dscp`, `backend routerqosd`, and disabled `backend windivert-lab`
+- `daemon run --once --dry-run` and `install-plan`
+- `lab baseline`, `lab run`, `lab report`, and `lab optimize`
 
 Current Phase 1 plan: [docs/designs/phase1-autopilot.md](designs/phase1-autopilot.md).
 

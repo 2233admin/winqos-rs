@@ -39,14 +39,21 @@ WFP/WinDivert -> local DSCP/throttle/queue -> router or local egress control
 
 ## Status
 
-Current MVP:
+Current Phase 1 CLI:
 
 - Windows TCP connection sampling through PowerShell
 - process-name/path classifier
-- local online learning state
-- routerqosd SSH backend
-- dry-run mode
-- JSON reports
+- built-in autopilot profiles: `game_boost`, `stream_guard`, `steam_sink`,
+  `proxy_smart`, `ai_work_lane`, `normal`, `paused`
+- confidence-scored decisions with explainable signals
+- local online learning and user feedback state
+- PETSCII-style `status` and `explain`
+- DSCP-first local backend in dry-run by default, with live apply guarded by
+  admin checks and concrete process/path selectors
+- routerqosd backend behind the backend trait
+- disabled WinDivert lab stub
+- daemon loop, pause/resume, receipts, and rollback
+- Network Lab baseline/run/report plus validation-gated optimizer
 - safe public defaults: no backend is enabled until configured
 
 Not implemented yet:
@@ -54,7 +61,8 @@ Not implemented yet:
 - Windows driver-level packet scheduling
 - UDP remote-flow attribution
 - signed service installer
-- WFP/WinDivert backend
+- WFP production backend
+- WinDivert production backend
 - GUI
 
 ## Quick Start
@@ -64,12 +72,23 @@ cargo build
 target\debug\winqos-rs.exe init --force
 target\debug\winqos-rs.exe sample
 target\debug\winqos-rs.exe run --once --dry-run
-target\debug\winqos-rs.exe run --once
+target\debug\winqos-rs.exe status
+target\debug\winqos-rs.exe explain
 ```
 
-The default config is `winqos.json`. The learner state is `winqos-state.json`.
-New configs start with all mutating backends disabled. Enable a backend only
-after checking the generated config.
+The default config is `winqos.json`. New configs start with all mutating backends
+disabled. Enable a backend only after checking the generated config.
+
+Runtime files stay local and are ignored by git:
+
+- `winqos-state.json`
+- `winqos-receipts.jsonl`
+- `winqos-feedback.jsonl`
+- `winqos-policy-state.json`
+- `winqos-lab-history.jsonl`
+- `profiles/*.current.json`
+- `profiles/*.best.json`
+- `profiles/*.history.jsonl`
 
 For a routerqosd backend, edit:
 
@@ -96,9 +115,47 @@ For a routerqosd backend, edit:
 The classifier is intentionally transparent. A connection report includes the
 reason for every decision.
 
+## Autopilot
+
+`run --once --dry-run` observes current traffic, selects a profile, explains the
+signals, and writes dry-run receipts for planned actions. It does not need a user
+to pick rules first.
+
+Useful controls:
+
+```powershell
+target\debug\winqos-rs.exe feedback prefer game_boost
+target\debug\winqos-rs.exe feedback bad --last
+target\debug\winqos-rs.exe pause --reason match
+target\debug\winqos-rs.exe resume
+target\debug\winqos-rs.exe rollback --last
+```
+
 ## Backend Contract
 
-Backends should accept generic `RouterCandidate`-style hints:
+Backends implement:
+
+```text
+inspect
+apply
+status
+remove
+explain
+capabilities
+```
+
+The DSCP backend is the default local direction. Dry-run is the default:
+
+```powershell
+target\debug\winqos-rs.exe backend dscp inspect
+target\debug\winqos-rs.exe backend dscp apply-dscp manual.game --dscp 46 --process-path C:\Games\game.exe
+target\debug\winqos-rs.exe backend dscp remove manual.game
+```
+
+Live DSCP apply requires `--live`, elevation, and a concrete selector. Broad
+traffic-class selectors remain dry-run only until resolved to specific processes.
+
+The routerqosd backend still accepts dynamic ipset hints:
 
 ```json
 {
@@ -117,6 +174,23 @@ ipset add rqosd_ele4 203.0.113.10,tcp:443 timeout 30 -exist
 ```
 
 The router must already have rules that map dynamic ipsets into `tc` classes.
+
+WinDivert is present only as an explicit disabled lab backend.
+
+## Network Lab
+
+Lab commands record local reports and feed the policy optimizer:
+
+```powershell
+target\debug\winqos-rs.exe lab baseline
+target\debug\winqos-rs.exe lab run game
+target\debug\winqos-rs.exe lab run stream
+target\debug\winqos-rs.exe lab report
+target\debug\winqos-rs.exe lab optimize steam_sink
+```
+
+The optimizer keeps a candidate only when its score improves. Equal or worse
+candidates are rejected and rollback is attempted from the last receipt.
 
 ## Learning Model
 

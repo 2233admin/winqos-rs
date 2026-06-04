@@ -1,7 +1,6 @@
-use crate::backend::{Backend, LocalDscpBackend, RouterQosdBackend, WinDivertLabBackend};
+use crate::backend::backend_for_kind;
 use crate::config::Config;
 use crate::model::RunReport;
-use crate::policy::BackendKind;
 use crate::profile::ProfileId;
 use crate::receipt::{RollbackReceipt, append_rollback_receipt, last_apply_receipt};
 use crate::runner::run_cycle;
@@ -259,18 +258,6 @@ fn rollback_last(config: &Config, dry_run: bool) -> Result<Option<RollbackReceip
         backend_for_kind(config, receipt.action.backend, dry_run).remove(&receipt.action.id)?;
     append_rollback_receipt(&config.receipts_path, &rollback)?;
     Ok(Some(rollback))
-}
-
-fn backend_for_kind(config: &Config, kind: BackendKind, dry_run: bool) -> Box<dyn Backend> {
-    match kind {
-        BackendKind::LocalDscp => Box::new(if dry_run {
-            LocalDscpBackend::dry_run()
-        } else {
-            LocalDscpBackend::live()
-        }),
-        BackendKind::RouterQosd => Box::new(RouterQosdBackend::new(config.clone(), dry_run)),
-        BackendKind::WinDivertLab => Box::new(WinDivertLabBackend),
-    }
 }
 
 fn compare_score(left: f32, right: f32) -> Ordering {

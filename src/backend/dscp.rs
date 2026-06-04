@@ -236,10 +236,10 @@ fn selector_script(selector: &ActionSelector) -> (String, bool, Option<String>) 
             true,
             None,
         ),
-        ActionSelector::RemoteEndpoint { protocol, .. } => (
-            format!("-IPProtocolMatchCondition {}", protocol.to_uppercase()),
-            true,
-            None,
+        ActionSelector::RemoteEndpoint { .. } => (
+            String::new(),
+            false,
+            Some("remote endpoint selectors are dry-run only until exact Windows QoS destination matching is implemented".into()),
         ),
         ActionSelector::TrafficClass { class } => (
             String::new(),
@@ -373,6 +373,30 @@ mod tests {
         assert!(plan.apply_script.contains("New-NetQosPolicy"));
         assert!(plan.apply_script.contains("-DSCPAction 46"));
         assert!(plan.apply_script.contains("-AppPathNameMatchCondition"));
+    }
+
+    #[test]
+    fn remote_endpoint_dscp_action_is_dry_run_only() {
+        let action = PolicyAction::dscp_mark(
+            "remote",
+            ProfileId::GameBoost,
+            ActionSelector::RemoteEndpoint {
+                protocol: "tcp".into(),
+                remote_addr: "8.8.8.8".into(),
+                remote_port: 443,
+            },
+            46,
+            "protect remote",
+        );
+
+        let plan = build_dscp_plan(&action).unwrap();
+
+        assert!(!plan.live_supported);
+        assert!(
+            plan.unsupported_reason
+                .unwrap()
+                .contains("remote endpoint selectors are dry-run only")
+        );
     }
 
     #[test]

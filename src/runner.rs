@@ -1,14 +1,12 @@
 use crate::autopilot::decide_autopilot;
-use crate::backend::{
-    Backend, LocalDscpBackend, RouterQosdBackend, WinDivertLabBackend, dedupe_candidates,
-};
+use crate::backend::{backend_for_kind, dedupe_candidates};
 use crate::classifier::Classifier;
 use crate::collector::collect_windows_tcp_connections;
 use crate::config::Config;
 use crate::feedback::{load_feedback_state, save_feedback_state};
 use crate::learning::{load_state, now_unix, save_state, update_learning};
 use crate::model::{BackendReport, ClassifiedConnection, ConnectionSample, RunReport};
-use crate::policy::{BackendKind, PolicyAction, PolicyActionKind};
+use crate::policy::{PolicyAction, PolicyActionKind};
 use crate::receipt::{Receipt, append_receipt};
 use anyhow::{Context, Result, anyhow};
 use std::collections::BTreeMap;
@@ -152,7 +150,7 @@ fn apply_policy_actions(
         if action.kind == PolicyActionKind::ObserveOnly {
             continue;
         }
-        let receipt = backend_for_action(config, action.backend, dry_run).apply(action)?;
+        let receipt = backend_for_kind(config, action.backend, dry_run).apply(action)?;
         append_receipt(&config.receipts_path, &receipt)?;
         receipts.push(receipt);
     }
@@ -165,7 +163,6 @@ fn apply_router_candidates(
     dry_run: bool,
 ) -> Result<(BackendReport, Vec<Receipt>)> {
     let mut receipts = Vec::new();
-    let backend = RouterQosdBackend::new(config.clone(), dry_run);
     for candidate in candidates {
         let action = PolicyAction::router_ipset(
             format!(
@@ -178,7 +175,7 @@ fn apply_router_candidates(
             candidate.member.clone(),
             candidate.reason.clone(),
         );
-        let receipt = backend.apply(&action)?;
+        let receipt = backend_for_kind(config, action.backend, dry_run).apply(&action)?;
         append_receipt(&config.receipts_path, &receipt)?;
         receipts.push(receipt);
     }
@@ -195,14 +192,6 @@ fn apply_router_candidates(
         },
         receipts,
     ))
-}
-
-fn backend_for_action(config: &Config, kind: BackendKind, dry_run: bool) -> Box<dyn Backend + '_> {
-    match kind {
-        BackendKind::LocalDscp => Box::new(LocalDscpBackend::new(dry_run)),
-        BackendKind::RouterQosd => Box::new(RouterQosdBackend::new(config.clone(), dry_run)),
-        BackendKind::WinDivertLab => Box::new(WinDivertLabBackend),
-    }
 }
 
 fn sanitize_action_id(value: &str) -> String {
