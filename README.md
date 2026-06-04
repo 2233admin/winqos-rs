@@ -153,6 +153,8 @@ The bigger target is a Windows network optimization suite:
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 
+Phase 1 product plan: [docs/designs/phase1-autopilot.md](docs/designs/phase1-autopilot.md).
+
 ## Safety
 
 `winqos-rs` should default to dry-run for new backends. Anything that modifies

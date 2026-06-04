@@ -113,6 +113,8 @@ Next:
 6. UI: PETSCII local dashboard
 7. Experimental Driver Track: WFP/WinDivert prototypes with hard opt-in
 
+Current Phase 1 plan: [docs/designs/phase1-autopilot.md](designs/phase1-autopilot.md).
+
 ## Non-Goals
 
 - no closed-source-only control plane
