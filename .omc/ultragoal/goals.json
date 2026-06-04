@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-06-04T09:49:55.993Z",
-  "updatedAt": "2026-06-04T10:35:04.535Z",
+  "updatedAt": "2026-06-04T10:44:47.883Z",
   "briefPath": ".omc/ultragoal/brief.md",
   "goalsPath": ".omc/ultragoal/goals.json",
   "ledgerPath": ".omc/ultragoal/ledger.jsonl",
@@ -23,10 +23,13 @@
       "id": "G002-core-domain-model",
       "title": "Core Domain Model",
       "objective": "Introduce Signal, Profile, PolicyAction, Receipt, Rollback, Backend trait, built-in pack schema, and local runtime file boundaries.",
-      "status": "pending",
-      "attempt": 0,
+      "status": "complete",
+      "attempt": 1,
       "createdAt": "2026-06-04T09:49:55.993Z",
-      "updatedAt": "2026-06-04T09:49:55.993Z"
+      "updatedAt": "2026-06-04T10:44:47.883Z",
+      "startedAt": "2026-06-04T10:36:10.711Z",
+      "completedAt": "2026-06-04T10:44:47.883Z",
+      "evidence": "Introduced core Signal, Profile/ProfilePack, PolicyAction, Receipt/Rollback, RuntimePaths, and Backend trait/domain status models; built-in Phase 1 profile pack covers game_boost, stream_guard, steam_sink, proxy_smart, ai_work_lane, normal, paused; local runtime file boundaries include config/state/receipts/feedback/policy/profiles; cargo fmt --check passed; cargo build passed; cargo test passed 26 tests; cargo clippy --all-targets --all-features -- -D warnings passed; CLI dry-run smoke collected 333 samples, 1 candidate, router backend disabled/no mutation; commit 05c5b31."
     },
     {
       "id": "G003-autopilot-decisions",
