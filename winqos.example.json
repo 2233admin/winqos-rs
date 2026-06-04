@@ -1,0 +1,72 @@
+{
+  "state_path": "winqos-state.json",
+  "interval_seconds": 5,
+  "candidate_timeout_seconds": 30,
+  "learning": {
+    "enabled": true,
+    "learn_bulk_after_score": 8,
+    "score_increment_for_bulk_hint": 3,
+    "score_increment_for_many_connections": 1,
+    "score_decrement_for_interactive_hint": 4
+  },
+  "classifier": {
+    "bulk_process_patterns": [
+      "steam",
+      "steamwebhelper",
+      "synology",
+      "onedrive",
+      "aria2",
+      "qbittorrent",
+      "transmission",
+      "epicgames",
+      "battle.net",
+      "docker",
+      "ollama"
+    ],
+    "interactive_process_patterns": [
+      "weflow",
+      "cursor",
+      "code",
+      "ssh",
+      "windowsterminal",
+      "terminal"
+    ],
+    "ignore_process_patterns": [
+      "verge-mihomo",
+      "mihomo",
+      "clash",
+      "python",
+      "pythonw",
+      "pwsh",
+      "powershell"
+    ],
+    "bulk_name_patterns": [
+      "download",
+      "update",
+      "sync"
+    ],
+    "bulk_ports": [
+      80,
+      443,
+      6881,
+      51413,
+      27014,
+      27015,
+      27016,
+      27017,
+      27018,
+      27019,
+      27020
+    ]
+  },
+  "backends": {
+    "routerqosd": {
+      "enabled": false,
+      "host": "192.168.1.1",
+      "port": 22,
+      "user": "root",
+      "key_path": "%USERPROFILE%\\.ssh\\id_ed25519",
+      "ssh_path": "ssh.exe"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+/target/
+/winqos.json
+/winqos-state.json
+*.log
+*.tmp
