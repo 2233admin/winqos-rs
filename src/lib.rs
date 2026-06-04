@@ -1,3 +1,4 @@
+pub mod adapter;
 pub mod autopilot;
 pub mod backend;
 pub mod classifier;
@@ -17,6 +18,7 @@ pub mod runner;
 pub mod runtime;
 pub mod signal;
 
+pub use adapter::{AdapterPlan, AdapterRecommendation, AdapterTier, NetworkAdapter};
 pub use autopilot::{AutopilotDecision, ProfileScore, decide_autopilot};
 pub use config::{Config, DEFAULT_CONFIG, DEFAULT_STATE};
 pub use daemon::{DaemonOptions, DaemonReport, InstallPlan};

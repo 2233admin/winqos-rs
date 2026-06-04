@@ -36,6 +36,8 @@ Current focus.
 - automatic profile selection
 - DSCP-first local backend
 - routerqosd backend
+- adapter capability planning
+- traffic-class to concrete process DSCP resolution
 - dry-run receipts and rollback
 - Network Lab reports
 - validation-gated optimizer
@@ -43,7 +45,7 @@ Current focus.
 
 Next:
 
-- UDP attribution
+- UDP remote-flow attribution
 - per-process byte deltas
 - congestion feedback from queue counters
 - OpenWrt backend
@@ -56,6 +58,10 @@ Next:
 - guard livestream upload from bulk traffic
 - demote Steam and launcher downloads when a match or stream is active
 - detect proxy-routed game traffic without marking the proxy engine itself as bulk
+- protect remote desktop/control/play apps such as RDP, Parsec, Sunshine/Moonlight,
+  ToDesk, RustDesk, RayLink, and UU Remote-style clients
+- protect AI work lanes for ChatGPT, Cursor, Claude/Codex-style agents, terminals,
+  SSH, and local inference
 - expose per-profile receipts: what was boosted, what was demoted, and why
 - support Steam, launcher downloads, Tencent/Delta-style shooters, voice chat, and browser streams as first-class scenarios
 
@@ -77,6 +83,8 @@ Next:
 ### Proxy And DNS
 
 - detect Clash/Mihomo/TUN/system proxy state
+- keep proxy engines as tunnel carriers, then shape by visible app intent
+- report when router visibility collapses to a proxy endpoint
 - verify DNS leak and IPv6 mismatch
 - report latency by endpoint and rule class
 - never rewrite user profiles without backup
@@ -125,6 +133,7 @@ Phase 1 CLI pieces now present:
 - `backend dscp`, `backend routerqosd`, and disabled `backend windivert-lab`
 - `daemon run --once --dry-run` and `install-plan`
 - `lab baseline`, `lab run`, `lab report`, and `lab optimize`
+- `adapters inspect` and `adapters plan`
 
 Current Phase 1 plan: [docs/designs/phase1-autopilot.md](designs/phase1-autopilot.md).
 

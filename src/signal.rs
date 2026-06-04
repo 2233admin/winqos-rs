@@ -8,6 +8,7 @@ pub enum SignalKind {
     GameProcess,
     StreamProcess,
     VoiceProcess,
+    RemoteControlProcess,
     BulkDownload,
     UploadPressure,
     ProxyProcess,

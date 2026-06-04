@@ -1,5 +1,6 @@
+use crate::adapter::{collect_adapters, plan_for_adapters};
 use crate::backend::{Backend, LocalDscpBackend, backend_for_kind};
-use crate::collector::collect_windows_tcp_connections;
+use crate::collector::collect_windows_connections;
 use crate::config::{Config, DEFAULT_CONFIG};
 use crate::daemon::{DaemonOptions, install_plan as build_install_plan, run_daemon};
 use crate::feedback::{
@@ -71,6 +72,10 @@ enum Commands {
     Lab {
         #[command(subcommand)]
         command: LabCommands,
+    },
+    Adapters {
+        #[command(subcommand)]
+        command: AdapterCommands,
     },
     Daemon {
         #[command(subcommand)]
@@ -157,6 +162,12 @@ enum DaemonCommands {
 }
 
 #[derive(Subcommand, Debug)]
+enum AdapterCommands {
+    Inspect,
+    Plan,
+}
+
+#[derive(Subcommand, Debug)]
 enum LabCommands {
     Baseline,
     Run {
@@ -182,7 +193,7 @@ pub fn run() -> Result<()> {
         Commands::Init { force } => init_config(&cli.config, force),
         Commands::Sample { json } => {
             let config = Config::load_or_default(&cli.config)?;
-            let samples = collect_windows_tcp_connections()?;
+            let samples = collect_windows_connections()?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&samples)?);
             } else {
@@ -293,6 +304,21 @@ pub fn run() -> Result<()> {
                     "{}",
                     serde_json::to_string_pretty(&optimize_latest(&config, profile, !live)?)?
                 ),
+            }
+            Ok(())
+        }
+        Commands::Adapters { command } => {
+            let adapters = collect_adapters()?;
+            match command {
+                AdapterCommands::Inspect => {
+                    println!("{}", serde_json::to_string_pretty(&adapters)?);
+                }
+                AdapterCommands::Plan => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&plan_for_adapters(adapters))?
+                    );
+                }
             }
             Ok(())
         }

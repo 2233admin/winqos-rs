@@ -14,7 +14,7 @@ pub struct ConnectionSample {
     pub state: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TrafficClass {
     Realtime,
@@ -35,9 +35,15 @@ pub struct ClassifiedConnection {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RouterCandidate {
+    #[serde(default = "default_router_candidate_class")]
+    pub class: TrafficClass,
     pub set_name: String,
     pub member: String,
     pub reason: String,
+}
+
+fn default_router_candidate_class() -> TrafficClass {
+    TrafficClass::Bulk
 }
 
 #[derive(Debug, Serialize)]

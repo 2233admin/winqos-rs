@@ -21,9 +21,11 @@ struct PowershellConnection {
     state: Option<String>,
 }
 
-pub fn collect_windows_tcp_connections() -> Result<Vec<ConnectionSample>> {
+pub fn collect_windows_connections() -> Result<Vec<ConnectionSample>> {
     let script = r#"
 $ErrorActionPreference = 'SilentlyContinue'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
 $procs = @{}
 Get-Process | ForEach-Object {
   $procs[[int]$_.Id] = [pscustomobject]@{
@@ -31,7 +33,8 @@ Get-Process | ForEach-Object {
     path = $_.Path
   }
 }
-Get-NetTCPConnection -State Established | ForEach-Object {
+$rows = @()
+$rows += Get-NetTCPConnection -State Established | ForEach-Object {
   $p = $procs[[int]$_.OwningProcess]
   [pscustomobject]@{
     pid = [int]$_.OwningProcess
@@ -42,7 +45,20 @@ Get-NetTCPConnection -State Established | ForEach-Object {
     remote_port = [int]$_.RemotePort
     state = $_.State.ToString()
   }
-} | ConvertTo-Json -Compress
+}
+$rows += Get-NetUDPEndpoint | ForEach-Object {
+  $p = $procs[[int]$_.OwningProcess]
+  [pscustomobject]@{
+    pid = [int]$_.OwningProcess
+    process = if ($p) { $p.name } else { "" }
+    path = if ($p) { $p.path } else { "" }
+    protocol = "udp"
+    remote_addr = "0.0.0.0"
+    remote_port = 0
+    state = "Bound"
+  }
+}
+$rows | ConvertTo-Json -Compress
 "#;
     let output = Command::new("powershell.exe")
         .args(["-NoProfile", "-Command", script])
@@ -55,6 +71,13 @@ Get-NetTCPConnection -State Established | ForEach-Object {
         ));
     }
     parse_powershell_connections(String::from_utf8_lossy(&output.stdout).trim())
+}
+
+pub fn collect_windows_tcp_connections() -> Result<Vec<ConnectionSample>> {
+    Ok(collect_windows_connections()?
+        .into_iter()
+        .filter(|sample| sample.protocol == "tcp")
+        .collect())
 }
 
 pub fn parse_powershell_connections(stdout: &str) -> Result<Vec<ConnectionSample>> {
@@ -108,5 +131,18 @@ mod tests {
 
         assert_eq!(samples.len(), 1);
         assert_eq!(samples[0].process_name, "steam");
+    }
+
+    #[test]
+    fn parses_udp_endpoint_rows() {
+        let samples = parse_powershell_connections(
+            r#"[{"pid":7,"process":"parsec","path":"C:\\Parsec\\parsec.exe","protocol":"udp","remote_addr":"0.0.0.0","remote_port":0,"state":"Bound"}]"#,
+        )
+        .unwrap();
+
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0].protocol, "udp");
+        assert_eq!(samples[0].process_name, "parsec");
+        assert_eq!(samples[0].remote_addr, "0.0.0.0");
     }
 }

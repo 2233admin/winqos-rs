@@ -163,17 +163,86 @@ pub fn signals_from_classified(
                 SignalKind::StreamProcess,
                 &label,
             );
+            add_signal(
+                &mut counts,
+                &mut examples,
+                SignalKind::UploadPressure,
+                &label,
+            );
         }
         if contains_any(&label, &["discord", "teamspeak", "weflow", "voice"]) {
             add_signal(&mut counts, &mut examples, SignalKind::VoiceProcess, &label);
         }
-        if contains_any(&label, &["verge-mihomo", "mihomo", "clash"]) {
+        if contains_any(
+            &label,
+            &[
+                "mstsc",
+                "rdpclip",
+                "parsec",
+                "sunshine",
+                "moonlight",
+                "todesk",
+                "anydesk",
+                "rustdesk",
+                "raylink",
+                "uuremote",
+                "uu_remote",
+                "sunlogin",
+                "nomachine",
+            ],
+        ) {
+            add_signal(
+                &mut counts,
+                &mut examples,
+                SignalKind::RemoteControlProcess,
+                &label,
+            );
+        }
+        if contains_any(
+            &label,
+            &[
+                "verge-mihomo",
+                "mihomo",
+                "clash",
+                "sing-box",
+                "singbox",
+                "v2ray",
+                "xray",
+                "hysteria",
+                "tuic",
+                "naiveproxy",
+                "nekoray",
+                "shadowsocks",
+                "tailscale",
+                "zerotier",
+                "wireguard",
+                "openvpn",
+                "sstap",
+                "proxifier",
+            ],
+        ) {
             add_signal(&mut counts, &mut examples, SignalKind::ProxyProcess, &label);
         }
         if contains_any(
             &label,
             &[
-                "cursor", "code", "ssh", "terminal", "ollama", "claude", "codex",
+                "cursor",
+                "code",
+                "ssh",
+                "terminal",
+                "ollama",
+                "claude",
+                "codex",
+                "chatgpt",
+                "openai",
+                "windsurf",
+                "trae",
+                "zed",
+                "lmstudio",
+                "lm studio",
+                "aider",
+                "continue",
+                "gemini",
             ],
         ) {
             add_signal(
@@ -310,6 +379,7 @@ mod tests {
             learned_score: 0,
             router_candidate: if class == TrafficClass::Bulk {
                 Some(RouterCandidate {
+                    class: TrafficClass::Bulk,
                     set_name: "rqosd_ele4".into(),
                     member: "8.8.8.8,tcp:443".into(),
                     reason: "bulk".into(),
@@ -354,6 +424,60 @@ mod tests {
         );
 
         assert_eq!(decision.profile, ProfileId::SteamSink);
+    }
+
+    #[test]
+    fn remote_control_selects_remote_lane() {
+        let mut item = classified("mstsc", TrafficClass::Realtime);
+        item.sample.protocol = "udp".into();
+
+        let decision = decide_with_pack(
+            &[item],
+            &FeedbackState::default(),
+            &builtin_profile_pack(),
+            true,
+            1,
+        );
+
+        assert_eq!(decision.profile, ProfileId::RemoteControlLane);
+        assert!(
+            decision
+                .signals
+                .iter()
+                .any(|signal| signal.kind == SignalKind::RemoteControlProcess)
+        );
+    }
+
+    #[test]
+    fn ai_work_selects_ai_lane_without_feedback() {
+        let decision = decide_with_pack(
+            &[classified("ChatGPT", TrafficClass::Interactive)],
+            &FeedbackState::default(),
+            &builtin_profile_pack(),
+            true,
+            1,
+        );
+
+        assert_eq!(decision.profile, ProfileId::AiWorkLane);
+    }
+
+    #[test]
+    fn proxy_engine_selects_proxy_smart_without_marking_it_directly() {
+        let decision = decide_with_pack(
+            &[classified("verge-mihomo", TrafficClass::Ignore)],
+            &FeedbackState::default(),
+            &builtin_profile_pack(),
+            true,
+            1,
+        );
+
+        assert_eq!(decision.profile, ProfileId::ProxySmart);
+        assert!(
+            decision
+                .actions
+                .iter()
+                .any(|action| action.id == "proxy_smart.observe_proxy")
+        );
     }
 
     #[test]

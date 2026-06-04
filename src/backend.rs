@@ -188,11 +188,13 @@ mod tests {
     fn dedupe_candidates_sorts_and_deduplicates() {
         let items = vec![
             RouterCandidate {
+                class: TrafficClass::Bulk,
                 set_name: "rqosd_ele4".into(),
                 member: "8.8.8.8,tcp:443".into(),
                 reason: "a".into(),
             },
             RouterCandidate {
+                class: TrafficClass::Bulk,
                 set_name: "rqosd_ele4".into(),
                 member: "8.8.8.8,tcp:443".into(),
                 reason: "a".into(),
@@ -214,6 +216,7 @@ mod tests {
         let script = build_routerqosd_script(
             &config,
             &[RouterCandidate {
+                class: TrafficClass::Bulk,
                 set_name: "rqosd_ele4".into(),
                 member: "8.8.8.8,tcp:443".into(),
                 reason: "bulk".into(),

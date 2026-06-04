@@ -3,7 +3,7 @@
 `winqos-rs` has four layers:
 
 ```text
-collector -> classifier -> learner -> backend
+collector -> classifier -> learner -> autopilot -> backend
 ```
 
 ## Collector
@@ -13,6 +13,8 @@ Collectors produce facts. They must not decide priority.
 Current collector:
 
 - Windows TCP connections via PowerShell `Get-NetTCPConnection`
+- Windows UDP endpoints via PowerShell `Get-NetUDPEndpoint`
+- Windows adapter facts via PowerShell `Get-NetAdapter`
 - process name/path via `Get-Process`
 
 Planned collectors:
@@ -45,14 +47,18 @@ That is intentional: network control needs receipts before cleverness.
 
 Backends consume candidates and mutate an external policy surface.
 
-Current backend:
+Current backends:
 
-- routerqosd over SSH
-- `ipset add rqosd_ele4/rqosd_ele6 ...`
+- Windows DSCP policy through `New-NetQosPolicy`
+- routerqosd over SSH with class-specific dynamic ipsets
+- disabled WinDivert lab backend
+
+The runner resolves broad traffic-class policy actions into concrete process
+path/name selectors before local DSCP apply. If it cannot resolve a safe selector,
+the action remains dry-run only.
 
 Planned backends:
 
 - OpenWrt SSH/ubus
-- Windows DSCP policy
 - WFP marking
 - WinDivert local scheduler

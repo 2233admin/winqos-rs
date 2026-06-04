@@ -1,12 +1,15 @@
 use crate::autopilot::decide_autopilot;
 use crate::backend::{backend_for_kind, dedupe_candidates};
 use crate::classifier::Classifier;
-use crate::collector::collect_windows_tcp_connections;
+use crate::collector::collect_windows_connections;
 use crate::config::Config;
 use crate::feedback::{load_feedback_state, save_feedback_state};
 use crate::learning::{load_state, now_unix, save_state, update_learning};
-use crate::model::{BackendReport, ClassifiedConnection, ConnectionSample, RunReport};
-use crate::policy::{PolicyAction, PolicyActionKind};
+use crate::model::{
+    BackendReport, ClassifiedConnection, ConnectionSample, RunReport, TrafficClass,
+};
+use crate::policy::{ActionSelector, BackendKind, PolicyAction, PolicyActionKind};
+use crate::profile::ProfileId;
 use crate::receipt::{Receipt, append_receipt};
 use anyhow::{Context, Result, anyhow};
 use std::collections::BTreeMap;
@@ -46,7 +49,7 @@ pub fn print_sample_table(samples: &[ConnectionSample], config: &Config) {
 }
 
 pub fn run_cycle(config: &Config, dry_run: bool) -> Result<RunReport> {
-    run_cycle_with_samples(config, collect_windows_tcp_connections()?, dry_run)
+    run_cycle_with_samples(config, collect_windows_connections()?, dry_run)
 }
 
 pub fn run_cycle_with_samples(
@@ -68,7 +71,8 @@ pub fn run_cycle_with_samples(
     let autopilot = decide_autopilot(&classified, &feedback, dry_run);
     let mut receipts = Vec::new();
     if !feedback.paused {
-        match apply_policy_actions(config, &autopilot.actions, dry_run) {
+        let resolved_actions = resolve_policy_actions(&autopilot.actions, &classified);
+        match apply_policy_actions(config, &resolved_actions, dry_run) {
             Ok(mut applied) => receipts.append(&mut applied),
             Err(error) => {
                 feedback.fail_closed(error.to_string(), now_unix());
@@ -96,7 +100,7 @@ pub fn run_cycle_with_samples(
             .filter_map(|item| item.router_candidate.clone()),
     );
     let backend = if config.backends.routerqosd.enabled {
-        match apply_router_candidates(config, &candidates, dry_run) {
+        match apply_router_candidates(config, &candidates, dry_run, autopilot.profile) {
             Ok((report, mut router_receipts)) => {
                 receipts.append(&mut router_receipts);
                 report
@@ -157,10 +161,81 @@ fn apply_policy_actions(
     Ok(receipts)
 }
 
+fn resolve_policy_actions(
+    actions: &[PolicyAction],
+    classified: &[ClassifiedConnection],
+) -> Vec<PolicyAction> {
+    let mut resolved = Vec::new();
+    for action in actions {
+        if action.backend != BackendKind::LocalDscp || action.kind != PolicyActionKind::MarkDscp {
+            resolved.push(action.clone());
+            continue;
+        }
+
+        let ActionSelector::TrafficClass { class } = &action.selector else {
+            resolved.push(action.clone());
+            continue;
+        };
+        let class = *class;
+
+        let mut selectors = BTreeMap::new();
+        for item in classified.iter().filter(|item| item.class == class) {
+            if let Some((key, selector)) = concrete_selector_for_process(item) {
+                selectors.entry(key).or_insert(selector);
+            }
+        }
+
+        if selectors.is_empty() {
+            let mut action = action.clone();
+            action.dry_run_only = true;
+            action.reason = format!(
+                "{}; unresolved {} class has no concrete process selector",
+                action.reason,
+                traffic_class_label(class)
+            );
+            resolved.push(action);
+            continue;
+        }
+
+        for (key, selector) in selectors.into_iter().take(32) {
+            let mut action = action.clone();
+            action.id = format!("{}.{}", action.id, sanitize_action_id(&key));
+            action.selector = selector;
+            action.reason = format!(
+                "{}; resolved {} class to {}",
+                action.reason,
+                traffic_class_label(class),
+                key
+            );
+            resolved.push(action);
+        }
+    }
+    resolved
+}
+
+fn concrete_selector_for_process(item: &ClassifiedConnection) -> Option<(String, ActionSelector)> {
+    let path = item.sample.process_path.trim();
+    if !path.is_empty() {
+        return Some((
+            path.into(),
+            ActionSelector::ProcessPath { path: path.into() },
+        ));
+    }
+    let name = item.sample.process_name.trim();
+    if !name.is_empty() {
+        return Some((
+            name.into(),
+            ActionSelector::ProcessName { name: name.into() },
+        ));
+    }
+    None
+}
+
 fn apply_router_candidates(
     config: &Config,
     candidates: &[crate::model::RouterCandidate],
     dry_run: bool,
+    active_profile: ProfileId,
 ) -> Result<(BackendReport, Vec<Receipt>)> {
     let mut receipts = Vec::new();
     for candidate in candidates {
@@ -170,7 +245,7 @@ fn apply_router_candidates(
                 candidate.set_name,
                 sanitize_action_id(&candidate.member)
             ),
-            crate::profile::ProfileId::SteamSink,
+            profile_for_router_candidate(candidate.class, active_profile),
             candidate.set_name.clone(),
             candidate.member.clone(),
             candidate.reason.clone(),
@@ -199,6 +274,33 @@ fn sanitize_action_id(value: &str) -> String {
         .chars()
         .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
         .collect()
+}
+
+fn profile_for_router_candidate(class: TrafficClass, active_profile: ProfileId) -> ProfileId {
+    match active_profile {
+        ProfileId::GameBoost
+        | ProfileId::StreamGuard
+        | ProfileId::RemoteControlLane
+        | ProfileId::ProxySmart
+        | ProfileId::AiWorkLane => active_profile,
+        ProfileId::SteamSink if class == TrafficClass::Bulk => ProfileId::SteamSink,
+        ProfileId::SteamSink | ProfileId::Normal | ProfileId::Paused => match class {
+            TrafficClass::Realtime => ProfileId::RemoteControlLane,
+            TrafficClass::Interactive => ProfileId::AiWorkLane,
+            TrafficClass::Bulk => ProfileId::SteamSink,
+            TrafficClass::Normal | TrafficClass::Ignore => ProfileId::Normal,
+        },
+    }
+}
+
+fn traffic_class_label(class: TrafficClass) -> &'static str {
+    match class {
+        TrafficClass::Realtime => "realtime",
+        TrafficClass::Interactive => "interactive",
+        TrafficClass::Normal => "normal",
+        TrafficClass::Bulk => "bulk",
+        TrafficClass::Ignore => "ignore",
+    }
 }
 
 #[cfg(test)]
@@ -252,6 +354,18 @@ mod tests {
         }
     }
 
+    fn sample_with(process: &str, path: &str, protocol: &str) -> ConnectionSample {
+        ConnectionSample {
+            pid: 2,
+            process_name: process.into(),
+            process_path: path.into(),
+            protocol: protocol.into(),
+            remote_addr: "8.8.8.8".into(),
+            remote_port: 443,
+            state: "Established".into(),
+        }
+    }
+
     #[test]
     fn run_cycle_reports_disabled_backend_without_executing() {
         let (config, _guard) = temp_state_config();
@@ -272,5 +386,52 @@ mod tests {
         assert_eq!(report.class_counts.get("bulk"), Some(&1));
         assert_eq!(report.backend.stdout, "backend disabled");
         assert!(!report.backend.executed);
+    }
+
+    #[test]
+    fn ai_work_actions_resolve_to_concrete_process_policy() {
+        let (config, _guard) = temp_state_config();
+
+        let report = run_cycle_with_samples(
+            &config,
+            vec![sample_with("ChatGPT", r"C:\\Apps\\ChatGPT.exe", "tcp")],
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(
+            report.autopilot.profile,
+            crate::profile::ProfileId::AiWorkLane
+        );
+        assert!(report.receipts[0].action.id.contains("ChatGPT"));
+        assert!(matches!(
+            report.receipts[0].action.selector,
+            ActionSelector::ProcessPath { .. }
+        ));
+        assert!(report.receipts[0].details["apply_script"].contains("-AppPathNameMatchCondition"));
+    }
+
+    #[test]
+    fn remote_control_udp_resolves_to_realtime_policy_and_router_class() {
+        let (config, _guard) = temp_state_config();
+
+        let report = run_cycle_with_samples(
+            &config,
+            vec![sample_with("parsec", r"C:\\Parsec\\parsec.exe", "udp")],
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(
+            report.autopilot.profile,
+            crate::profile::ProfileId::RemoteControlLane
+        );
+        assert_eq!(report.class_counts.get("realtime"), Some(&1));
+        assert_eq!(report.candidates[0].class, TrafficClass::Realtime);
+        assert_eq!(report.candidates[0].set_name, "rqosd_rt4");
+        assert!(matches!(
+            report.receipts[0].action.selector,
+            ActionSelector::ProcessPath { .. }
+        ));
     }
 }

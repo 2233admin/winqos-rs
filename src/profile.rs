@@ -12,6 +12,7 @@ pub const BUILTIN_PACK_SCHEMA_VERSION: u16 = 1;
 pub enum ProfileId {
     GameBoost,
     StreamGuard,
+    RemoteControlLane,
     SteamSink,
     ProxySmart,
     AiWorkLane,
@@ -24,6 +25,7 @@ impl ProfileId {
         match self {
             Self::GameBoost => "game_boost",
             Self::StreamGuard => "stream_guard",
+            Self::RemoteControlLane => "remote_control_lane",
             Self::SteamSink => "steam_sink",
             Self::ProxySmart => "proxy_smart",
             Self::AiWorkLane => "ai_work_lane",
@@ -46,6 +48,9 @@ impl FromStr for ProfileId {
         match value {
             "game_boost" | "game" => Ok(Self::GameBoost),
             "stream_guard" | "stream" => Ok(Self::StreamGuard),
+            "remote_control_lane" | "remote_control" | "remote" | "rdp" | "uu" => {
+                Ok(Self::RemoteControlLane)
+            }
             "steam_sink" | "steam" => Ok(Self::SteamSink),
             "proxy_smart" | "proxy" => Ok(Self::ProxySmart),
             "ai_work_lane" | "ai" | "work" => Ok(Self::AiWorkLane),
@@ -122,10 +127,10 @@ pub fn builtin_profile_pack() -> ProfilePack {
                 ],
                 vec![
                     PolicyAction::dscp_mark(
-                        "game_boost.protect_interactive",
+                        "game_boost.protect_realtime",
                         ProfileId::GameBoost,
                         ActionSelector::TrafficClass {
-                            class: TrafficClass::Interactive,
+                            class: TrafficClass::Realtime,
                         },
                         46,
                         "protect active game and voice flows",
@@ -157,7 +162,7 @@ pub fn builtin_profile_pack() -> ProfilePack {
                         "stream_guard.protect_upload",
                         ProfileId::StreamGuard,
                         ActionSelector::TrafficClass {
-                            class: TrafficClass::Interactive,
+                            class: TrafficClass::Realtime,
                         },
                         34,
                         "guard livestream upload and call traffic",
@@ -170,6 +175,39 @@ pub fn builtin_profile_pack() -> ProfilePack {
                         },
                         8,
                         "reduce download pressure while streaming",
+                    ),
+                ],
+            ),
+            profile(
+                ProfileId::RemoteControlLane,
+                "Remote Control Lane",
+                "Protect remote desktop, remote control, and remote play flows from local bulk pressure.",
+                850,
+                0.5,
+                vec![
+                    SignalRule::required(SignalKind::RemoteControlProcess, 0.6),
+                    SignalRule::weighted(SignalKind::UdpFlow, 0.2),
+                    SignalRule::weighted(SignalKind::TcpConnection, 0.1),
+                    SignalRule::weighted(SignalKind::ProxyProcess, 0.1),
+                ],
+                vec![
+                    PolicyAction::dscp_mark(
+                        "remote_control_lane.protect_realtime",
+                        ProfileId::RemoteControlLane,
+                        ActionSelector::TrafficClass {
+                            class: TrafficClass::Realtime,
+                        },
+                        46,
+                        "protect RDP, remote control, and remote play packets",
+                    ),
+                    PolicyAction::dscp_mark(
+                        "remote_control_lane.demote_bulk",
+                        ProfileId::RemoteControlLane,
+                        ActionSelector::TrafficClass {
+                            class: TrafficClass::Bulk,
+                        },
+                        8,
+                        "keep downloads behind remote-control latency",
                     ),
                 ],
             ),
@@ -199,33 +237,72 @@ pub fn builtin_profile_pack() -> ProfilePack {
                 "Keep proxy engines unmarked while preserving visible app intent.",
                 540,
                 0.45,
-                vec![SignalRule::required(SignalKind::ProxyProcess, 0.65)],
-                vec![PolicyAction::observe_only(
-                    "proxy_smart.observe_proxy",
-                    ProfileId::ProxySmart,
-                    BackendKind::LocalDscp,
-                    "do not blindly mark tunnel engine traffic",
-                )],
+                vec![
+                    SignalRule::required(SignalKind::ProxyProcess, 0.65),
+                    SignalRule::weighted(SignalKind::GameProcess, 0.15),
+                    SignalRule::weighted(SignalKind::RemoteControlProcess, 0.15),
+                    SignalRule::weighted(SignalKind::AiWorkProcess, 0.1),
+                    SignalRule::weighted(SignalKind::BulkDownload, 0.1),
+                ],
+                vec![
+                    PolicyAction::observe_only(
+                        "proxy_smart.observe_proxy",
+                        ProfileId::ProxySmart,
+                        BackendKind::LocalDscp,
+                        "do not blindly mark tunnel engine traffic",
+                    ),
+                    PolicyAction::dscp_mark(
+                        "proxy_smart.protect_visible_realtime",
+                        ProfileId::ProxySmart,
+                        ActionSelector::TrafficClass {
+                            class: TrafficClass::Realtime,
+                        },
+                        46,
+                        "protect visible realtime apps instead of the tunnel process",
+                    ),
+                    PolicyAction::dscp_mark(
+                        "proxy_smart.demote_bulk",
+                        ProfileId::ProxySmart,
+                        ActionSelector::TrafficClass {
+                            class: TrafficClass::Bulk,
+                        },
+                        8,
+                        "keep proxied bulk traffic behind interactive work",
+                    ),
+                ],
             ),
             profile(
                 ProfileId::AiWorkLane,
                 "AI Work Lane",
-                "Protect coding and local AI work from bulk transfer contention.",
+                "Protect AI tools, coding agents, terminals, SSH, and local inference from bulk transfer contention.",
                 500,
                 0.45,
                 vec![
-                    SignalRule::required(SignalKind::AiWorkProcess, 0.5),
-                    SignalRule::weighted(SignalKind::TcpConnection, 0.2),
+                    SignalRule::required(SignalKind::AiWorkProcess, 0.55),
+                    SignalRule::weighted(SignalKind::TcpConnection, 0.15),
+                    SignalRule::weighted(SignalKind::ProxyProcess, 0.1),
+                    SignalRule::weighted(SignalKind::BulkDownload, 0.1),
                 ],
-                vec![PolicyAction::dscp_mark(
-                    "ai_work_lane.protect_work",
-                    ProfileId::AiWorkLane,
-                    ActionSelector::TrafficClass {
-                        class: TrafficClass::Interactive,
-                    },
-                    26,
-                    "protect coding, ssh, and model interaction flows",
-                )],
+                vec![
+                    PolicyAction::dscp_mark(
+                        "ai_work_lane.protect_work",
+                        ProfileId::AiWorkLane,
+                        ActionSelector::TrafficClass {
+                            class: TrafficClass::Interactive,
+                        },
+                        26,
+                        "protect AI prompts, coding agents, SSH, and model interaction flows",
+                    ),
+                    PolicyAction::dscp_mark(
+                        "ai_work_lane.demote_bulk",
+                        ProfileId::AiWorkLane,
+                        ActionSelector::TrafficClass {
+                            class: TrafficClass::Bulk,
+                        },
+                        8,
+                        "keep downloads behind interactive AI work",
+                    ),
+                ],
             ),
             profile(
                 ProfileId::Normal,
@@ -291,9 +368,10 @@ mod tests {
 
         assert_eq!(pack.schema_version, BUILTIN_PACK_SCHEMA_VERSION);
         assert!(pack.built_in);
-        assert_eq!(ids.len(), 7);
+        assert_eq!(ids.len(), 8);
         assert!(ids.contains(&ProfileId::GameBoost));
         assert!(ids.contains(&ProfileId::StreamGuard));
+        assert!(ids.contains(&ProfileId::RemoteControlLane));
         assert!(ids.contains(&ProfileId::SteamSink));
         assert!(ids.contains(&ProfileId::ProxySmart));
         assert!(ids.contains(&ProfileId::AiWorkLane));
@@ -340,6 +418,10 @@ mod tests {
             ProfileId::GameBoost
         );
         assert_eq!("steam".parse::<ProfileId>().unwrap(), ProfileId::SteamSink);
+        assert_eq!(
+            "rdp".parse::<ProfileId>().unwrap(),
+            ProfileId::RemoteControlLane
+        );
         assert!("wat".parse::<ProfileId>().is_err());
     }
 }

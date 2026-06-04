@@ -3,8 +3,9 @@ use super::{
     push_routerqosd,
 };
 use crate::config::Config;
-use crate::model::RouterCandidate;
+use crate::model::{RouterCandidate, TrafficClass};
 use crate::policy::{ActionValue, BackendKind, PolicyAction, PolicyActionKind};
+use crate::profile::ProfileId;
 use crate::receipt::{Receipt, ReceiptStatus, RollbackReceipt};
 use anyhow::{Result, anyhow};
 use std::collections::BTreeMap;
@@ -129,11 +130,23 @@ fn candidate_from_action(action: &PolicyAction) -> Result<RouterCandidate> {
     }
     match &action.value {
         ActionValue::IpSet { set_name, member } => Ok(RouterCandidate {
+            class: router_candidate_class(action.profile),
             set_name: set_name.clone(),
             member: member.clone(),
             reason: action.reason.clone(),
         }),
         _ => Err(anyhow!("routerqosd action requires an ipset value")),
+    }
+}
+
+fn router_candidate_class(profile: ProfileId) -> TrafficClass {
+    match profile {
+        ProfileId::GameBoost | ProfileId::RemoteControlLane | ProfileId::StreamGuard => {
+            TrafficClass::Realtime
+        }
+        ProfileId::AiWorkLane => TrafficClass::Interactive,
+        ProfileId::SteamSink => TrafficClass::Bulk,
+        ProfileId::ProxySmart | ProfileId::Normal | ProfileId::Paused => TrafficClass::Bulk,
     }
 }
 

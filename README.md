@@ -39,18 +39,21 @@ WFP/WinDivert -> local DSCP/throttle/queue -> router or local egress control
 
 ## Status
 
-Current Phase 1 CLI:
+Current CLI:
 
-- Windows TCP connection sampling through PowerShell
-- process-name/path classifier
+- Windows TCP connection and UDP endpoint sampling through PowerShell
+- process-name/path classifier for games, livestreams, AI work, remote control,
+  proxy engines, and bulk transfer pressure
 - built-in autopilot profiles: `game_boost`, `stream_guard`, `steam_sink`,
-  `proxy_smart`, `ai_work_lane`, `normal`, `paused`
+  `remote_control_lane`, `proxy_smart`, `ai_work_lane`, `normal`, `paused`
 - confidence-scored decisions with explainable signals
 - local online learning and user feedback state
 - PETSCII-style `status` and `explain`
 - DSCP-first local backend in dry-run by default, with live apply guarded by
-  admin checks and concrete process/path selectors
-- routerqosd backend behind the backend trait
+  admin checks and automatic traffic-class to process/path resolution
+- routerqosd backend behind the backend trait, with class-specific ipset hints
+- adapter inspection and local/router/proxy planning for wired, Wi-Fi, and tunnel
+  adapters
 - disabled WinDivert lab stub
 - daemon loop, pause/resume, receipts, and rollback
 - Network Lab baseline/run/report plus validation-gated optimizer
@@ -107,6 +110,7 @@ For a routerqosd backend, edit:
 
 ## Traffic Classes
 
+- `realtime`: games, remote desktop/control/play, voice, livestream capture
 - `interactive`: terminals, editors, AI clients, SSH
 - `normal`: default traffic
 - `bulk`: Steam, sync tools, downloaders, repeated learned bulk processes
@@ -120,6 +124,10 @@ reason for every decision.
 `run --once --dry-run` observes current traffic, selects a profile, explains the
 signals, and writes dry-run receipts for planned actions. It does not need a user
 to pick rules first.
+
+When a profile action targets a traffic class, the runner resolves that class to
+visible concrete processes before applying local DSCP. If it cannot resolve a
+safe process selector, that action stays dry-run only.
 
 Useful controls:
 
@@ -153,12 +161,14 @@ target\debug\winqos-rs.exe backend dscp remove manual.game
 ```
 
 Live DSCP apply requires `--live`, elevation, and a concrete selector. Broad
-traffic-class selectors remain dry-run only until resolved to specific processes.
+traffic-class selectors are resolved to specific processes by the runner; if no
+process can be resolved, the receipt remains dry-run only.
 
 The routerqosd backend still accepts dynamic ipset hints:
 
 ```json
 {
+  "class": "bulk",
   "set_name": "rqosd_ele4",
   "member": "203.0.113.10,tcp:443",
   "reason": "bulk_process:steam"
@@ -174,8 +184,31 @@ ipset add rqosd_ele4 203.0.113.10,tcp:443 timeout 30 -exist
 ```
 
 The router must already have rules that map dynamic ipsets into `tc` classes.
+Default class set names are:
+
+- `rqosd_rt4` / `rqosd_rt6` for realtime
+- `rqosd_hi4` / `rqosd_hi6` for interactive
+- `rqosd_ele4` / `rqosd_ele6` for bulk
+
+Proxy engines are intentionally treated as tunnel carriers. The safer policy is
+to protect the visible app intent and report the proxy endpoint, not blindly mark
+the entire tunnel as high priority.
 
 WinDivert is present only as an explicit disabled lab backend.
+
+## Adapter Planning
+
+Use adapter planning to pick the right local/router/proxy strategy for the
+current NIC:
+
+```powershell
+target\debug\winqos-rs.exe adapters inspect
+target\debug\winqos-rs.exe adapters plan
+```
+
+High-speed wired links get a `local_full_blood` plan: local DSCP process marking
+paired with routerqosd class ipsets. Wi-Fi gets a latency guard plan. Virtual,
+VPN, and TUN adapters get a proxy tunnel guard plan.
 
 ## Network Lab
 
