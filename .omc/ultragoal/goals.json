@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-06-04T09:49:55.993Z",
-  "updatedAt": "2026-06-04T11:01:56.791Z",
+  "updatedAt": "2026-06-04T11:02:57.414Z",
   "briefPath": ".omc/ultragoal/brief.md",
   "goalsPath": ".omc/ultragoal/goals.json",
   "ledgerPath": ".omc/ultragoal/ledger.jsonl",
@@ -47,10 +47,11 @@
       "id": "G004-local-and-router-backends",
       "title": "Local And Router Backends",
       "objective": "Implement DSCP-first local backend with inspect/apply/status/remove/explain, adapt routerqosd to the Backend trait, and add disabled WinDivert lab stub.",
-      "status": "pending",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "createdAt": "2026-06-04T09:49:55.993Z",
-      "updatedAt": "2026-06-04T09:49:55.993Z"
+      "updatedAt": "2026-06-04T11:02:57.414Z",
+      "startedAt": "2026-06-04T11:02:57.414Z"
     },
     {
       "id": "G005-daemon-safety-loop",
@@ -80,5 +81,6 @@
       "updatedAt": "2026-06-04T09:49:55.993Z"
     }
   ],
-  "claudeObjective": "Complete all ultragoal stories in .omc/ultragoal/goals.json: G001-architecture-modularization Architecture Modularization; G002-core-domain-model Core Domain Model; G003-autopilot-decisions Autopilot Decisions; G004-local-and-router-backends Local And Router Backends; G005-daemon-safety-loop Daemon Safety Loop; G006-network-lab-and-optimizer Network Lab And Optimizer; G007-final-quality-gate Final Quality Gate"
+  "claudeObjective": "Complete all ultragoal stories in .omc/ultragoal/goals.json: G001-architecture-modularization Architecture Modularization; G002-core-domain-model Core Domain Model; G003-autopilot-decisions Autopilot Decisions; G004-local-and-router-backends Local And Router Backends; G005-daemon-safety-loop Daemon Safety Loop; G006-network-lab-and-optimizer Network Lab And Optimizer; G007-final-quality-gate Final Quality Gate",
+  "activeGoalId": "G004-local-and-router-backends"
 }
