@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "createdAt": "2026-06-04T09:49:55.993Z",
+  "updatedAt": "2026-06-04T09:50:09.901Z",
+  "briefPath": ".omc/ultragoal/brief.md",
+  "goalsPath": ".omc/ultragoal/goals.json",
+  "ledgerPath": ".omc/ultragoal/ledger.jsonl",
+  "claudeGoalMode": "aggregate",
+  "goals": [
+    {
+      "id": "G001-architecture-modularization",
+      "title": "Architecture Modularization",
+      "objective": "Split the single-file MVP into repo-native modules while preserving current behavior and adding tests for existing collector/classifier/learner/routerqosd paths.",
+      "status": "in_progress",
+      "attempt": 1,
+      "createdAt": "2026-06-04T09:49:55.993Z",
+      "updatedAt": "2026-06-04T09:50:09.901Z",
+      "startedAt": "2026-06-04T09:50:09.901Z"
+    },
+    {
+      "id": "G002-core-domain-model",
+      "title": "Core Domain Model",
+      "objective": "Introduce Signal, Profile, PolicyAction, Receipt, Rollback, Backend trait, built-in pack schema, and local runtime file boundaries.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-04T09:49:55.993Z",
+      "updatedAt": "2026-06-04T09:49:55.993Z"
+    },
+    {
+      "id": "G003-autopilot-decisions",
+      "title": "Autopilot Decisions",
+      "objective": "Implement built-in autopilot packs, confidence scoring, profile selection, user feedback learning, and PETSCII CLI status/explain outputs in dry-run form.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-04T09:49:55.993Z",
+      "updatedAt": "2026-06-04T09:49:55.993Z"
+    },
+    {
+      "id": "G004-local-and-router-backends",
+      "title": "Local And Router Backends",
+      "objective": "Implement DSCP-first local backend with inspect/apply/status/remove/explain, adapt routerqosd to the Backend trait, and add disabled WinDivert lab stub.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-04T09:49:55.993Z",
+      "updatedAt": "2026-06-04T09:49:55.993Z"
+    },
+    {
+      "id": "G005-daemon-safety-loop",
+      "title": "Daemon Safety Loop",
+      "objective": "Add always-on autopilot loop, boot/install planning surface, pause/resume/status controls, fail-closed mutation handling, receipts, and rollback behavior.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-04T09:49:55.993Z",
+      "updatedAt": "2026-06-04T09:49:55.993Z"
+    },
+    {
+      "id": "G006-network-lab-and-optimizer",
+      "title": "Network Lab And Optimizer",
+      "objective": "Add lab baseline/run/report commands plus validation-gated policy optimizer that keeps better policies and rolls back worse candidates.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-04T09:49:55.993Z",
+      "updatedAt": "2026-06-04T09:49:55.993Z"
+    },
+    {
+      "id": "G007-final-quality-gate",
+      "title": "Final Quality Gate",
+      "objective": "Run ai-slop-cleaner, full verification, code review, fix blockers, update docs, and only then mark the ultragoal complete.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-04T09:49:55.993Z",
+      "updatedAt": "2026-06-04T09:49:55.993Z"
+    }
+  ],
+  "claudeObjective": "Complete all ultragoal stories in .omc/ultragoal/goals.json: G001-architecture-modularization Architecture Modularization; G002-core-domain-model Core Domain Model; G003-autopilot-decisions Autopilot Decisions; G004-local-and-router-backends Local And Router Backends; G005-daemon-safety-loop Daemon Safety Loop; G006-network-lab-and-optimizer Network Lab And Optimizer; G007-final-quality-gate Final Quality Gate",
+  "activeGoalId": "G001-architecture-modularization"
+}
