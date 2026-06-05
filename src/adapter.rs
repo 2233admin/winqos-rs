@@ -1,3 +1,4 @@
+use crate::security_paths::powershell_path;
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
@@ -76,7 +77,7 @@ Get-NetAdapter | Sort-Object -Property ifIndex | ForEach-Object {
   }
 } | ConvertTo-Json -Compress
 "#;
-    let output = Command::new("powershell.exe")
+    let output = Command::new(powershell_path())
         .args(["-NoProfile", "-Command", script])
         .output()
         .context("failed to run powershell adapter collector")?;

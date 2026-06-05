@@ -1,3 +1,4 @@
+use crate::security_paths::{default_router_ssh_path, normalize_router_ssh_path};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -30,6 +31,8 @@ pub struct Config {
     pub learning: LearningConfig,
     pub classifier: ClassifierConfig,
     pub backends: BackendConfig,
+    #[serde(default)]
+    pub automation: AutomationConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +78,37 @@ pub struct RouterQosdConfig {
     pub class_sets: RouterClassSets,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutomationMode {
+    ObserveOnly,
+    #[default]
+    Assist,
+    Live,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutomationConfig {
+    pub mode: AutomationMode,
+    #[serde(default = "default_observation_cycles")]
+    pub observation_cycles: u32,
+    #[serde(default = "default_auto_rollback_seconds")]
+    pub auto_rollback_seconds: u64,
+    #[serde(default = "default_min_confidence")]
+    pub min_confidence: f32,
+}
+
+impl Default for AutomationConfig {
+    fn default() -> Self {
+        Self {
+            mode: AutomationMode::Assist,
+            observation_cycles: default_observation_cycles(),
+            auto_rollback_seconds: default_auto_rollback_seconds(),
+            min_confidence: default_min_confidence(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouterClassSets {
     pub realtime_v4: String,
@@ -114,14 +148,17 @@ impl RouterClassSets {
 
 impl Config {
     pub fn load_or_default(path: &Path) -> Result<Self> {
-        if path.exists() {
+        let mut config = if path.exists() {
             let text = fs::read_to_string(path)
                 .with_context(|| format!("failed to read config {}", path.display()))?;
             serde_json::from_str(&text)
-                .with_context(|| format!("failed to parse config {}", path.display()))
+                .with_context(|| format!("failed to parse config {}", path.display()))?
         } else {
-            Ok(Self::default_for_current_user())
-        }
+            Self::default_for_current_user()
+        };
+        config.backends.routerqosd.ssh_path =
+            normalize_router_ssh_path(config.backends.routerqosd.ssh_path);
+        Ok(config)
     }
 
     pub fn default_for_current_user() -> Self {
@@ -188,10 +225,11 @@ impl Config {
                     port: 22,
                     user: "root".into(),
                     key_path: PathBuf::from(format!("{home}\\.ssh\\id_ed25519")),
-                    ssh_path: PathBuf::from("ssh.exe"),
+                    ssh_path: default_router_ssh_path(),
                     class_sets: RouterClassSets::default(),
                 },
             },
+            automation: AutomationConfig::default(),
         }
     }
 }
@@ -331,9 +369,22 @@ fn default_profiles_dir() -> PathBuf {
     PathBuf::from(DEFAULT_PROFILES_DIR)
 }
 
+fn default_observation_cycles() -> u32 {
+    3
+}
+
+fn default_auto_rollback_seconds() -> u64 {
+    120
+}
+
+fn default_min_confidence() -> f32 {
+    0.55
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn default_config_is_safe_for_public_use() {
@@ -352,7 +403,15 @@ mod tests {
         assert_eq!(config.backends.routerqosd.host, "192.168.1.1");
         assert_eq!(config.backends.routerqosd.port, 22);
         assert_eq!(config.backends.routerqosd.user, "root");
+        assert_eq!(
+            config.backends.routerqosd.ssh_path,
+            default_router_ssh_path()
+        );
         assert_eq!(config.backends.routerqosd.class_sets.bulk_v4, "rqosd_ele4");
+        assert!(matches!(config.automation.mode, AutomationMode::Assist));
+        assert_eq!(config.automation.observation_cycles, 3);
+        assert_eq!(config.automation.auto_rollback_seconds, 120);
+        assert_eq!(config.automation.min_confidence, 0.55);
         assert!(
             config
                 .classifier
@@ -406,9 +465,25 @@ mod tests {
   }
 }"#;
 
-        let config: Config = serde_json::from_str(text).unwrap();
+        let mut path = std::env::temp_dir();
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        path.push(format!("winqos-config-old-fields-{ts}.json"));
+        fs::write(&path, text).unwrap();
+        let config = Config::load_or_default(&path).unwrap();
+        let _ = fs::remove_file(&path);
 
         assert_eq!(config.backends.routerqosd.class_sets.bulk_v4, "rqosd_ele4");
+        assert_eq!(
+            config.backends.routerqosd.ssh_path,
+            default_router_ssh_path()
+        );
+        assert!(matches!(config.automation.mode, AutomationMode::Assist));
+        assert_eq!(config.automation.observation_cycles, 3);
+        assert_eq!(config.automation.auto_rollback_seconds, 120);
+        assert_eq!(config.automation.min_confidence, 0.55);
         assert!(
             config
                 .classifier
@@ -421,5 +496,17 @@ mod tests {
                 .proxy_process_patterns
                 .contains(&"clash".into())
         );
+    }
+
+    #[test]
+    fn normalize_relative_router_ssh_path() {
+        let mut config = Config::default_for_current_user();
+        config.backends.routerqosd.ssh_path = "relative\\evil.exe".into();
+        let normalized = {
+            let path = config.backends.routerqosd.ssh_path;
+            crate::security_paths::normalize_router_ssh_path(path)
+        };
+
+        assert_eq!(normalized, default_router_ssh_path());
     }
 }

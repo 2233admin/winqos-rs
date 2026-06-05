@@ -16,6 +16,7 @@ pub mod profile;
 pub mod receipt;
 pub mod runner;
 pub mod runtime;
+pub mod security_paths;
 pub mod signal;
 
 pub use adapter::{AdapterPlan, AdapterRecommendation, AdapterTier, NetworkAdapter};

@@ -28,6 +28,16 @@ pub struct FeedbackState {
     #[serde(default)]
     pub last_action_ids: Vec<String>,
     #[serde(default)]
+    pub auto_observation_count: u32,
+    #[serde(default)]
+    pub last_applied_profile: Option<ProfileId>,
+    #[serde(default)]
+    pub last_applied_confidence: f32,
+    #[serde(default)]
+    pub last_applied_unix: u64,
+    #[serde(default)]
+    pub last_applied_action_ids: Vec<String>,
+    #[serde(default)]
     pub last_explanation: Vec<String>,
 }
 
@@ -80,6 +90,57 @@ impl FeedbackState {
         self.last_confidence = confidence;
         self.last_action_ids = action_ids;
         self.last_explanation = explanation;
+    }
+
+    pub fn observe_for_assist(
+        &mut self,
+        profile: ProfileId,
+        confidence: f32,
+        min_confidence: f32,
+        observation_cycles: u32,
+    ) {
+        if confidence < min_confidence {
+            self.auto_observation_count = 0;
+            return;
+        }
+
+        if self.last_profile == Some(profile) {
+            self.auto_observation_count = self.auto_observation_count.saturating_add(1);
+        } else {
+            self.auto_observation_count = 1;
+        }
+
+        self.auto_observation_count = self.auto_observation_count.min(observation_cycles.max(1));
+    }
+
+    pub fn assist_should_apply(&self, min_confidence: f32, observation_cycles: u32) -> bool {
+        self.last_profile.is_some()
+            && self.last_confidence >= min_confidence
+            && self.auto_observation_count >= observation_cycles.max(1)
+    }
+
+    pub fn clear_auto_observation(&mut self) {
+        self.auto_observation_count = 0;
+    }
+
+    pub fn remember_live_apply(
+        &mut self,
+        profile: ProfileId,
+        confidence: f32,
+        action_ids: Vec<String>,
+        updated_unix: u64,
+    ) {
+        self.last_applied_profile = Some(profile);
+        self.last_applied_confidence = confidence;
+        self.last_applied_unix = updated_unix;
+        self.last_applied_action_ids = action_ids;
+    }
+
+    pub fn clear_last_apply_tracking(&mut self) {
+        self.last_applied_profile = None;
+        self.last_applied_confidence = 0.0;
+        self.last_applied_unix = 0;
+        self.last_applied_action_ids.clear();
     }
 
     pub fn pause(&mut self, reason: impl Into<String>, updated_unix: u64) {

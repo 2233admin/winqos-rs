@@ -1,4 +1,5 @@
 use crate::model::ConnectionSample;
+use crate::security_paths::powershell_path;
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use std::process::Command;
@@ -60,7 +61,7 @@ $rows += Get-NetUDPEndpoint | ForEach-Object {
 }
 $rows | ConvertTo-Json -Compress
 "#;
-    let output = Command::new("powershell.exe")
+    let output = Command::new(powershell_path())
         .args(["-NoProfile", "-Command", script])
         .output()
         .context("failed to run powershell connection collector")?;

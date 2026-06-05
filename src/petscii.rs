@@ -1,5 +1,6 @@
 use crate::autopilot::AutopilotDecision;
 use crate::feedback::FeedbackState;
+use crate::model::RunReport;
 use crate::profile::ProfileId;
 
 pub fn render_decision(decision: &AutopilotDecision) -> String {
@@ -33,6 +34,58 @@ pub fn render_decision(decision: &AutopilotDecision) -> String {
     lines.push(String::new());
     lines.push("INFORMATION".into());
     lines.extend(decision.information.iter().take(8).cloned());
+    lines.join("\n")
+}
+
+pub fn render_run_report(report: &RunReport) -> String {
+    let mode = if report.autopilot.dry_run {
+        "observe"
+    } else {
+        "auto-apply"
+    };
+    let mut lines = vec![
+        "+-------------------------- WQ AUTO -----------------------------+".into(),
+        format!(
+            "| MODE {:<14} PROFILE {:<14} CONF {:>5.2} |",
+            mode.to_uppercase(),
+            profile_label(report.autopilot.profile),
+            report.autopilot.confidence
+        ),
+        format!(
+            "| SAMPLES {:<9} CANDIDATES {:<8} RECEIPTS {:<8} |",
+            report.sample_count,
+            report.candidate_count,
+            report.receipts.len()
+        ),
+        "+----------------------------------------------------------------+".into(),
+        String::new(),
+        "PLAN".into(),
+    ];
+
+    if report.receipts.is_empty() {
+        lines.push("  no actions generated".into());
+    } else {
+        for receipt in report.receipts.iter().take(6) {
+            let status = if receipt.dry_run { "DRY" } else { "LIVE" };
+            lines.push(format!("  [{status}] {}", receipt.action.id));
+        }
+        if report.receipts.len() > 6 {
+            lines.push(format!("  ... +{} more actions", report.receipts.len() - 6));
+        }
+    }
+    lines.push(String::new());
+    lines.push(format!(
+        "BACKEND {} {}",
+        report.backend.name,
+        if report.backend.dry_run {
+            "observe only"
+        } else {
+            "active"
+        }
+    ));
+    if report.autopilot.dry_run {
+        lines.push("  effect will wait for confidence gate".into());
+    }
     lines.join("\n")
 }
 

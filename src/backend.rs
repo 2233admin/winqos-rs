@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::model::{BackendReport, RouterCandidate};
 use crate::policy::{BackendKind, PolicyAction};
 use crate::receipt::{Receipt, RollbackReceipt};
+use crate::security_paths::normalize_router_ssh_path;
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -105,6 +106,7 @@ pub fn push_routerqosd(
 ) -> Result<BackendReport> {
     let backend = &config.backends.routerqosd;
     let script = build_routerqosd_script(config, candidates)?;
+    let ssh_path = normalize_router_ssh_path(backend.ssh_path.clone());
 
     if dry_run {
         return Ok(BackendReport {
@@ -118,7 +120,7 @@ pub fn push_routerqosd(
     }
 
     let target = format!("{}@{}", backend.user, backend.host);
-    let mut child = Command::new(&backend.ssh_path)
+    let mut child = Command::new(&ssh_path)
         .arg("-p")
         .arg(backend.port.to_string())
         .arg("-i")

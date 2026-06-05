@@ -167,6 +167,30 @@ pub fn last_apply_receipt(path: &Path) -> Result<Option<Receipt>> {
         }))
 }
 
+pub fn last_live_apply_receipt(path: &Path) -> Result<Option<Receipt>> {
+    Ok(load_receipt_records(path)?
+        .into_iter()
+        .rev()
+        .find_map(|record| match record {
+            ReceiptRecord::Apply { receipt }
+                if !receipt.dry_run && receipt.status == ReceiptStatus::Applied =>
+            {
+                Some(receipt)
+            }
+            _ => None,
+        }))
+}
+
+pub fn last_apply_receipt_for_action(path: &Path, action_id: &str) -> Result<Option<Receipt>> {
+    Ok(load_receipt_records(path)?
+        .into_iter()
+        .rev()
+        .find_map(|record| match record {
+            ReceiptRecord::Apply { receipt } if receipt.action.id == action_id => Some(receipt),
+            _ => None,
+        }))
+}
+
 fn append_record(path: &Path, record: &ReceiptRecord) -> Result<()> {
     ensure_parent_dir(path)?;
     let mut file = OpenOptions::new()

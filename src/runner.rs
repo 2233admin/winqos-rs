@@ -2,7 +2,7 @@ use crate::autopilot::decide_autopilot;
 use crate::backend::{backend_for_kind, dedupe_candidates};
 use crate::classifier::Classifier;
 use crate::collector::collect_windows_connections;
-use crate::config::Config;
+use crate::config::{AutomationMode, Config};
 use crate::feedback::{load_feedback_state, save_feedback_state};
 use crate::learning::{load_state, now_unix, save_state, update_learning};
 use crate::model::{
@@ -10,7 +10,9 @@ use crate::model::{
 };
 use crate::policy::{ActionSelector, BackendKind, PolicyAction, PolicyActionKind};
 use crate::profile::ProfileId;
-use crate::receipt::{Receipt, append_receipt};
+use crate::receipt::{
+    Receipt, ReceiptStatus, append_receipt, append_rollback_receipt, last_apply_receipt_for_action,
+};
 use anyhow::{Context, Result, anyhow};
 use std::collections::BTreeMap;
 use std::fs;
@@ -52,10 +54,56 @@ pub fn run_cycle(config: &Config, dry_run: bool) -> Result<RunReport> {
     run_cycle_with_samples(config, collect_windows_connections()?, dry_run)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunMode {
+    Observe,
+    Assist,
+    Live,
+}
+
+impl RunMode {
+    pub fn from_config(automation_mode: &AutomationMode) -> Self {
+        match automation_mode {
+            AutomationMode::ObserveOnly => Self::Observe,
+            AutomationMode::Assist => Self::Assist,
+            AutomationMode::Live => Self::Live,
+        }
+    }
+}
+
+pub fn run_cycle_with_mode(
+    config: &Config,
+    samples: Vec<ConnectionSample>,
+    mode: RunMode,
+) -> Result<RunReport> {
+    run_cycle_with_mode_and_flags(config, samples, mode, false)
+}
+
+fn resolve_mode_from_request(config: &Config, dry_run: bool) -> RunMode {
+    if dry_run {
+        return RunMode::Observe;
+    }
+    RunMode::from_config(&config.automation.mode)
+}
+
 pub fn run_cycle_with_samples(
     config: &Config,
     samples: Vec<ConnectionSample>,
     dry_run: bool,
+) -> Result<RunReport> {
+    run_cycle_with_mode_and_flags(
+        config,
+        samples,
+        resolve_mode_from_request(config, dry_run),
+        false,
+    )
+}
+
+fn run_cycle_with_mode_and_flags(
+    config: &Config,
+    samples: Vec<ConnectionSample>,
+    mode: RunMode,
+    force_apply: bool,
 ) -> Result<RunReport> {
     let mut state = load_state(&config.state_path)?;
     let classifier = Classifier::new(config)?;
@@ -68,11 +116,53 @@ pub fn run_cycle_with_samples(
     }
     save_state(&config.state_path, &state)?;
     let mut feedback = load_feedback_state(&config.policy_state_path)?;
-    let autopilot = decide_autopilot(&classified, &feedback, dry_run);
+    let mut autopilot = decide_autopilot(&classified, &feedback, mode == RunMode::Observe);
+
+    if matches!(mode, RunMode::Observe) {
+        feedback.clear_auto_observation();
+    }
+
+    let now = now_unix();
+    let mut should_apply = matches!(mode, RunMode::Live);
+    if !feedback.paused && matches!(mode, RunMode::Assist) {
+        feedback.observe_for_assist(
+            autopilot.profile,
+            autopilot.confidence,
+            config.automation.min_confidence,
+            config.automation.observation_cycles,
+        );
+        should_apply = feedback.assist_should_apply(
+            config.automation.min_confidence,
+            config.automation.observation_cycles,
+        ) || force_apply;
+    } else if feedback.paused {
+        feedback.clear_auto_observation();
+    }
+
+    let mut rolled_back = false;
+    if feedback.last_applied_profile.is_some() && !force_apply {
+        let stale_window = feedback.last_applied_unix != 0
+            && now.saturating_sub(feedback.last_applied_unix)
+                <= config.automation.auto_rollback_seconds;
+        if stale_window {
+            let regression = feedback.last_applied_confidence.is_sign_positive()
+                && (feedback.last_applied_confidence - autopilot.confidence) > 0.2;
+            let profile_shift = feedback.last_applied_profile != Some(autopilot.profile);
+            if regression && profile_shift {
+                rolled_back = rollback_last_applied_batch(config, &mut feedback, now)?;
+            }
+        }
+    }
+    if rolled_back {
+        should_apply = false;
+    }
+    let effective_dry_run = !should_apply;
+    autopilot.dry_run = effective_dry_run;
+
     let mut receipts = Vec::new();
     if !feedback.paused {
         let resolved_actions = resolve_policy_actions(&autopilot.actions, &classified);
-        match apply_policy_actions(config, &resolved_actions, dry_run) {
+        match apply_policy_actions(config, &resolved_actions, effective_dry_run) {
             Ok(mut applied) => receipts.append(&mut applied),
             Err(error) => {
                 feedback.fail_closed(error.to_string(), now_unix());
@@ -90,8 +180,31 @@ pub fn run_cycle_with_samples(
             .map(|action| action.id.clone())
             .collect(),
         autopilot.information.clone(),
-        now_unix(),
+        now,
     );
+    if should_apply {
+        let applied_action_ids = receipts
+            .iter()
+            .filter(|receipt| !receipt.dry_run && receipt.status == ReceiptStatus::Applied)
+            .map(|receipt| receipt.action.id.clone())
+            .collect::<Vec<_>>();
+        feedback.remember_live_apply(
+            autopilot.profile,
+            autopilot.confidence,
+            applied_action_ids,
+            now,
+        );
+    } else {
+        let apply_tracking_expired = feedback.last_applied_unix != 0
+            && now.saturating_sub(feedback.last_applied_unix)
+                > config.automation.auto_rollback_seconds;
+        if matches!(mode, RunMode::Observe) || apply_tracking_expired {
+            feedback.clear_last_apply_tracking();
+        }
+        if !rolled_back && (matches!(mode, RunMode::Observe) || matches!(mode, RunMode::Assist)) {
+            feedback.last_error = None;
+        }
+    }
     save_feedback_state(&config.policy_state_path, &feedback)?;
 
     let candidates = dedupe_candidates(
@@ -100,7 +213,7 @@ pub fn run_cycle_with_samples(
             .filter_map(|item| item.router_candidate.clone()),
     );
     let backend = if config.backends.routerqosd.enabled {
-        match apply_router_candidates(config, &candidates, dry_run, autopilot.profile) {
+        match apply_router_candidates(config, &candidates, effective_dry_run, autopilot.profile) {
             Ok((report, mut router_receipts)) => {
                 receipts.append(&mut router_receipts);
                 report
@@ -115,7 +228,7 @@ pub fn run_cycle_with_samples(
     } else {
         BackendReport {
             name: "routerqosd".into(),
-            dry_run,
+            dry_run: effective_dry_run,
             executed: false,
             ok: true,
             stdout: "backend disabled".into(),
@@ -132,6 +245,41 @@ pub fn run_cycle_with_samples(
         candidates,
         backend,
     })
+}
+
+fn rollback_last_applied_batch(
+    config: &Config,
+    feedback: &mut crate::feedback::FeedbackState,
+    now: u64,
+) -> Result<bool> {
+    if feedback.last_applied_action_ids.is_empty() {
+        feedback.clear_last_apply_tracking();
+        return Ok(false);
+    }
+
+    let mut rolled = false;
+    for action_id in feedback.last_applied_action_ids.clone() {
+        let Some(receipt) = last_apply_receipt_for_action(&config.receipts_path, &action_id)?
+        else {
+            continue;
+        };
+        if receipt.dry_run || receipt.status != ReceiptStatus::Applied {
+            continue;
+        }
+        if now.saturating_sub(receipt.created_unix) > config.automation.auto_rollback_seconds {
+            continue;
+        }
+        let backend = backend_for_kind(config, receipt.action.backend, false);
+        let rollback = backend.remove(&action_id)?;
+        append_rollback_receipt(&config.receipts_path, &rollback)?;
+        rolled = true;
+    }
+
+    if rolled {
+        feedback.last_error = Some("auto-rollback triggered by unstable confidence".into());
+    }
+    feedback.clear_last_apply_tracking();
+    Ok(rolled)
 }
 
 pub fn class_counts(items: &[ClassifiedConnection]) -> BTreeMap<String, usize> {
@@ -433,5 +581,47 @@ mod tests {
             report.receipts[0].action.selector,
             ActionSelector::ProcessPath { .. }
         ));
+    }
+
+    #[test]
+    fn assist_observation_preserves_recent_live_apply_tracking() {
+        let (mut config, _guard) = temp_state_config();
+        config.automation.mode = AutomationMode::Assist;
+        config.automation.observation_cycles = 3;
+        config.automation.auto_rollback_seconds = 120;
+        let now = now_unix();
+        let mut feedback = crate::feedback::FeedbackState::default();
+        feedback.set_last_decision(
+            crate::profile::ProfileId::RemoteControlLane,
+            0.95,
+            vec!["winqos-dscp-remote-control".into()],
+            vec![],
+            now.saturating_sub(1),
+        );
+        feedback.remember_live_apply(
+            crate::profile::ProfileId::RemoteControlLane,
+            0.95,
+            vec!["winqos-dscp-remote-control".into()],
+            now.saturating_sub(1),
+        );
+        save_feedback_state(&config.policy_state_path, &feedback).unwrap();
+
+        let report = run_cycle_with_mode(
+            &config,
+            vec![sample_with("parsec", r"C:\\Parsec\\parsec.exe", "udp")],
+            RunMode::Assist,
+        )
+        .unwrap();
+
+        assert!(report.autopilot.dry_run);
+        let saved = load_feedback_state(&config.policy_state_path).unwrap();
+        assert_eq!(
+            saved.last_applied_profile,
+            Some(crate::profile::ProfileId::RemoteControlLane)
+        );
+        assert_eq!(
+            saved.last_applied_action_ids,
+            vec!["winqos-dscp-remote-control".to_string()]
+        );
     }
 }

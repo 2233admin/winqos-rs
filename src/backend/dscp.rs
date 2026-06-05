@@ -4,6 +4,7 @@ use super::{
 use crate::model::TrafficClass;
 use crate::policy::{ActionSelector, ActionValue, BackendKind, PolicyAction, PolicyActionKind};
 use crate::receipt::{Receipt, ReceiptStatus, RollbackReceipt};
+use crate::security_paths::powershell_path;
 use anyhow::{Result, anyhow};
 use std::collections::BTreeMap;
 use std::process::Command;
@@ -302,7 +303,7 @@ fn ps_quote(value: &str) -> String {
 }
 
 fn powershell_available() -> bool {
-    Command::new("powershell.exe")
+    Command::new(powershell_path())
         .args(["-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"])
         .output()
         .map(|output| output.status.success())
@@ -316,7 +317,7 @@ fn is_elevated() -> Result<bool> {
 }
 
 fn run_powershell(script: &str) -> Result<String> {
-    let output = Command::new("powershell.exe")
+    let output = Command::new(powershell_path())
         .args(["-NoProfile", "-Command", script])
         .output()
         .map_err(|err| anyhow!("failed to run powershell: {err}"))?;

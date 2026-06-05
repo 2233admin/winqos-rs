@@ -1,0 +1,121 @@
+name: Build and Package
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: winqos-rs
+  PACKAGE_NAME: winqos-rs-windows-x64
+
+jobs:
+  verify:
+    name: Verify and package Windows build
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup component add rustfmt clippy
+
+      - name: Check formatting
+        shell: pwsh
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        shell: pwsh
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Run tests
+        shell: pwsh
+        run: cargo test --locked
+
+      - name: Build release binary
+        shell: pwsh
+        run: cargo build --locked --release
+
+      - name: Package Windows artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $packageName = $env:PACKAGE_NAME
+          $distRoot = Join-Path $PWD "dist"
+          $packageDir = Join-Path $distRoot $packageName
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+
+          Copy-Item -LiteralPath "target\release\$($env:BINARY_NAME).exe" -Destination $packageDir
+          foreach ($file in @("README.md", "LICENSE", "winqos.example.json")) {
+            if (Test-Path -LiteralPath $file) {
+              Copy-Item -LiteralPath $file -Destination $packageDir
+            }
+          }
+          if (Test-Path -LiteralPath "docs") {
+            Copy-Item -LiteralPath "docs" -Destination $packageDir -Recurse
+          }
+
+          $binaryPath = Join-Path $packageDir "$($env:BINARY_NAME).exe"
+          $hash = Get-FileHash -LiteralPath $binaryPath -Algorithm SHA256
+          "$($hash.Hash.ToLowerInvariant())  $($env:BINARY_NAME).exe" |
+            Set-Content -LiteralPath (Join-Path $packageDir "SHA256SUMS.txt")
+
+          $zipPath = Join-Path $distRoot "$packageName.zip"
+          if (Test-Path -LiteralPath $zipPath) {
+            Remove-Item -LiteralPath $zipPath -Force
+          }
+          Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}
+          path: dist/${{ env.PACKAGE_NAME }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish tagged release
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}
+          path: dist
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $asset = "dist\$($env:PACKAGE_NAME).zip"
+          $PSNativeCommandUseErrorActionPreference = $false
+          gh release view "$env:GITHUB_REF_NAME" 1>$null 2>$null
+          $viewExit = $LASTEXITCODE
+          if ($viewExit -eq 0) {
+            gh release upload "$env:GITHUB_REF_NAME" $asset --clobber
+            exit $LASTEXITCODE
+          }
+          if ($viewExit -eq 1) {
+            gh release create "$env:GITHUB_REF_NAME" $asset --generate-notes
+            exit $LASTEXITCODE
+          }
+          exit $viewExit

@@ -1,4 +1,5 @@
 /target/
+/dist/
 /winqos.json
 /winqos-state.json
 /winqos-receipts.jsonl
@@ -10,3 +11,4 @@
 /profiles/*.history.jsonl
 *.log
 *.tmp
+.gstack/
