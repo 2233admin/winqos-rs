@@ -70,29 +70,59 @@ Not implemented yet:
 
 ## Windows Package
 
-GitHub Actions builds the Windows package; local `dist/` output is only a
+GitHub Actions builds the Windows package. Local `dist/` output is only a
 scratch artifact and is ignored by git.
 
+- Download `winqos-rs-windows-x64.zip` from
+  [GitHub Releases](https://github.com/2233admin/winqos-rs/releases).
+- Unzip it anywhere writable, for example `C:\Tools\winqos-rs`.
+- Run commands from that folder in PowerShell.
 - Pushes and pull requests run formatting, clippy, tests, and a release build.
-- The workflow uploads `winqos-rs-windows-x64.zip` as the build artifact.
 - Tags matching `v*` publish the same zip to GitHub Releases.
 
 ## Quick Start
 
+For normal Windows users, start from the release zip:
+
+```powershell
+cd C:\Tools\winqos-rs
+.\winqos-rs.exe init --force
+.\winqos-rs.exe quickstart --cycles 4
+.\winqos-rs.exe sample
+.\winqos-rs.exe run --once --dry-run
+.\winqos-rs.exe status
+.\winqos-rs.exe explain
+```
+
+The default path is observe-only. It writes local state and receipts, but it does
+not change packet handling until a live backend is explicitly enabled.
+
+For router users who already have `router-qosd` rules on ASUSWRT/koolshare:
+
+```powershell
+.\winqos-rs.exe quickstart --cycles 4 --enable-router --router-host 192.168.1.1 --router-user root
+.\winqos-rs.exe run --once --dry-run
+```
+
+After reading `winqos.json` and the latest receipt, live apply is explicit:
+
+```powershell
+.\winqos-rs.exe quickstart --cycles 4 --live
+.\winqos-rs.exe run --once --mode live
+```
+
+For source builds:
+
 ```powershell
 cargo build
 target\debug\winqos-rs.exe init --force
-target\debug\winqos-rs.exe quickstart --cycles 4 --enable-router --router-host 192.168.1.1
-target\debug\winqos-rs.exe sample
-target\debug\winqos-rs.exe run --once --dry-run
-target\debug\winqos-rs.exe status
-target\debug\winqos-rs.exe explain
+target\debug\winqos-rs.exe quickstart --cycles 4
 ```
 
 `quickstart` is the zero-friction flow for “装上就能跑”:
 
 ```powershell
-target\debug\winqos-rs.exe quickstart [--cycles N] [--live] [--enable-router] [--router-host X] [--router-user Y] [--interval Z] [--json]
+.\winqos-rs.exe quickstart [--cycles N] [--live] [--enable-router] [--router-host X] [--router-user Y] [--interval Z] [--json]
 ```
 
 默认是 `--dry-run`，会先把配置补齐（可选打开路由器端 backend）后做一段固定周期试运行。加 `--live` 才会尝试真实写入 DSCP / 路由后端。
