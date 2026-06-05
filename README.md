@@ -68,6 +68,15 @@ Not implemented yet:
 - WinDivert production backend
 - GUI
 
+## Windows Package
+
+GitHub Actions builds the Windows package; local `dist/` output is only a
+scratch artifact and is ignored by git.
+
+- Pushes and pull requests run formatting, clippy, tests, and a release build.
+- The workflow uploads `winqos-rs-windows-x64.zip` as the build artifact.
+- Tags matching `v*` publish the same zip to GitHub Releases.
+
 ## Quick Start
 
 ```powershell

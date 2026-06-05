@@ -17,13 +17,13 @@ env:
 jobs:
   verify:
     name: Verify and package Windows build
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     permissions:
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         shell: pwsh
@@ -79,7 +79,7 @@ jobs:
           Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.PACKAGE_NAME }}
           path: dist/${{ env.PACKAGE_NAME }}.zip
@@ -89,13 +89,13 @@ jobs:
     name: Publish tagged release
     needs: verify
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     permissions:
       contents: write
 
     steps:
       - name: Download Windows artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.PACKAGE_NAME }}
           path: dist
