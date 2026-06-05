@@ -94,6 +94,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Download Windows artifact
         uses: actions/download-artifact@v8
         with:
@@ -107,15 +110,16 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $asset = "dist\$($env:PACKAGE_NAME).zip"
+          $repo = $env:GITHUB_REPOSITORY
           $PSNativeCommandUseErrorActionPreference = $false
-          gh release view "$env:GITHUB_REF_NAME" 1>$null 2>$null
+          gh release view "$env:GITHUB_REF_NAME" --repo "$repo" 1>$null 2>$null
           $viewExit = $LASTEXITCODE
           if ($viewExit -eq 0) {
-            gh release upload "$env:GITHUB_REF_NAME" $asset --clobber
+            gh release upload "$env:GITHUB_REF_NAME" $asset --clobber --repo "$repo"
             exit $LASTEXITCODE
           }
           if ($viewExit -eq 1) {
-            gh release create "$env:GITHUB_REF_NAME" $asset --generate-notes
+            gh release create "$env:GITHUB_REF_NAME" $asset --generate-notes --repo "$repo"
             exit $LASTEXITCODE
           }
           exit $viewExit
